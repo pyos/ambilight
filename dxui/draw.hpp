@@ -10,9 +10,6 @@
 #include <directxmath.h>
 #include <dxgi1_2.h>
 
-#include <dxui/id_pixel.h>
-#include <dxui/id_vertex.h>
-
 // Construct a quad, i.e. a rectangle composed of two triangles.
 // Whether the coordinates are in UV or pixels depends on what
 // you're going to do with it. Usage:
@@ -99,7 +96,8 @@ namespace ui {
 
         // Draw a textured object onto a surface. Vertex coordinates must be given in pixels;
         // calling this function will transform them into UV.
-        void draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util::span<vertex> vertices, RECT cull);
+        void draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util::span<vertex> vertices, RECT cull,
+                  bool distanceCoded = false);
 
         // Convert a PNG image into a BGRA 32-bit texture.
         winapi::com_ptr<ID3D11Texture2D> textureFromPNG(util::span<const uint8_t>);
@@ -134,6 +132,7 @@ namespace ui {
         winapi::com_ptr<ID3D11DeviceContext> context;
         winapi::com_ptr<ID3D11VertexShader> vertexId;
         winapi::com_ptr<ID3D11PixelShader> pixelId;
+        winapi::com_ptr<ID3D11PixelShader> pixelDistanceDecoder;
         winapi::com_ptr<ID3D11InputLayout> inputLayout;
         winapi::com_ptr<ID3D11SamplerState> linear;
         winapi::com_ptr<ID3D11BlendState> blendOver;

@@ -80,7 +80,7 @@ void ui::grid::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, R
     }
 }
 
-void ui::grid::onMouse(POINT abs, int keys) {
+bool ui::grid::onMouse(POINT abs, int keys) {
     widget* target = nullptr;
     auto rel = relative(abs);
     if (cols[0].start <= rel.x || rows[0].start <= rel.y) {
@@ -95,8 +95,7 @@ void ui::grid::onMouse(POINT abs, int keys) {
     if (lastMouseEvent && lastMouseEvent != target)
         lastMouseEvent->onMouseLeave();
     lastMouseEvent = target;
-    if (lastMouseEvent)
-        lastMouseEvent->onMouse(abs, keys);
+    return lastMouseEvent && lastMouseEvent->onMouse(abs, keys);
 }
 
 void ui::grid::onMouseLeave() {
@@ -112,32 +111,41 @@ static winapi::com_ptr<ID3D11Texture2D> builtinTexture(ui::dxcontext& ctx) {
     return ctx.textureFromPNG(resource);
 }
 
-template <typename F /* = void(size_t, util::span<const char>) */>
-static void splitString(const char* start, const char* end, char sep, size_t limit, F&& f) {
+template <typename T, typename F>
+static util::span<T> strip(util::span<T> in, F&& discard) {
+    auto a = in.begin();
+    auto b = in.end();
+    while (a < b && discard(a[0])) a++;
+    while (a < b && discard(b[-1])) b--;
+    return util::span<T>(a, b - a);
+}
+
+template <typename T, typename F /* = void(size_t, util::span<T>) */>
+static void splitString(util::span<T> string, T sep, size_t limit, F&& f) {
+    auto it = string.begin();
     for (size_t i = 0;; i++) {
-        auto next = i + 1 == limit ? end : std::find(start, end, sep);
-        f(i, util::span<const char>(start, next - start));
-        if (next == end)
+        auto next = i + 1 == limit ? string.end() : std::find(it, string.end(), sep);
+        f(i, util::span<T>(it, next - it));
+        if (next == string.end())
             break;
-        start = next + 1;
+        it = next + 1;
     }
 }
 
-template <size_t columns, typename F /* = void(util::span<const char>[columns]) */>
+template <size_t columns, typename F /* = void(size_t, util::span<const char>[columns]) */>
 static void readPseudoCSV(util::span<const char> resource, F&& f) {
-    splitString(resource.begin(), resource.end(), '\n', 0, [&](size_t, util::span<const char> line) {
+    size_t skipped = 0;
+    splitString<const char>(resource, '\n', 0, [&](size_t lineno, util::span<const char> line) {
         // Ignore empty lines and comments (starting with whitespace and then `#`).
-        if (std::all_of(line.begin(), line.end(), [](char c) { return isspace(c); }) || line[0] == '#')
+        if (std::all_of(line.begin(), line.end(), [](char c) { return isspace(c); }) || line[0] == '#') {
+            skipped++;
             return;
-        util::span<const char> stripped[columns];
-        splitString(line.begin(), line.end(), ',', columns, [&](size_t i, util::span<const char> part) {
-            auto a = part.begin();
-            auto b = part.end();
-            while (a < b && isspace(a[ 0])) a++;
-            while (a < b && isspace(b[-1])) b--;
-            stripped[i] = util::span<const char>(a, b - a);
+        }
+        util::span<const char> stripped[columns] = {};
+        splitString<const char>(line, ',', columns, [&](size_t i, util::span<const char> part) {
+            stripped[i] = strip(part, [](char c) { return isspace(c); });
         });
-        f(stripped);
+        f(lineno - skipped, stripped);
     });
 }
 
@@ -161,7 +169,7 @@ static RECT builtinRect(builtin_rect r) {
             throw std::runtime_error("IDD_WIDGETS_RECTS TEXT-type resource could nont be loaded");
         std::unordered_map<std::string_view, RECT> map;
         // x, y, width, height, name with optional whitespace
-        readPseudoCSV<5>(resource.reinterpret<const char>(), [&](util::span<const char> columns[5]) {
+        readPseudoCSV<5>(resource.reinterpret<const char>(), [&](size_t, util::span<const char> columns[5]) {
             POINT p = {atol(columns[0].data()), atol(columns[1].data())};
             POINT q = {atol(columns[2].data()), atol(columns[3].data())};
             std::string_view name{columns[4].data(), columns[4].size()};
@@ -265,10 +273,81 @@ void ui::slider::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total,
     ctx.draw(target, ctx.cachedTexture<builtinTexture>(), rotate ? vquads : hquads, dirty);
 }
 
+int ui::font::nativeSize() const {
+    if (nativeSize_ < 0)
+        loadAscii();
+    return nativeSize_;
+}
+
+const ui::font_symbol* ui::font::loadAscii() const {
+    if (ascii.empty()) {
+        ascii.resize(256);
+        readPseudoCSV<8>(charmap, [&](size_t lineno, util::span<const char> columns[8]) {
+            if (lineno == 0) {
+                nativeSize_ = atol(columns[1].data());
+            } else if (uint32_t cp = atol(columns[0].data()); cp < 256) {
+                auto& c = ascii[cp];
+                c.x = atoi(columns[1].data());
+                c.y = atoi(columns[2].data());
+                c.w = atoi(columns[3].data());
+                c.h = atoi(columns[4].data());
+                c.originX = atoi(columns[5].data());
+                c.originY = atoi(columns[6].data());
+                c.advance = atoi(columns[7].data());
+            }
+        });
+    }
+    return ascii.data();
+}
+
 POINT ui::label::measureMinEx() const {
-    return {0, 0}; // TODO
+    POINT ret = {0, 0};
+    long x = 0;
+    long y = 0;
+    // TODO non-ASCII text
+    const auto& table = font->loadAscii();
+    splitString<const wchar_t>(text, L'\n', 0, [&](size_t, util::span<const wchar_t> line) {
+        long w = 0;
+        if (auto cs = strip(line, [](wchar_t c) { return c >= 256; })) {
+            // For the first and last character, we also want to include the space
+            // that is overlapped by other characters.
+            wchar_t a = cs[0], b = cs[cs.size() - 1];
+            w += table[a].originX;
+            w += table[b].w - table[b].advance - table[b].originX;
+            for (wchar_t c : cs) if (c < 256) w += table[c].advance;
+        }
+        x  = std::max(x, w);
+        y += font->nativeSize() * lineHeight;
+    });
+    double scale = (double)fontSize / font->nativeSize();
+    return {(LONG)(x * scale + 0.5), (LONG)(y * scale + 0.5)};
 }
 
 void ui::label::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
+    std::vector<ui::vertex> quads;
+    quads.reserve(text.size() * 6);
     // TODO use DirectWrite or something.
+    double scale = (double)fontSize / font->nativeSize();
+    long y = -font->nativeSize() * lineHeight / 4;
+    // TODO non-ASCII text
+    const auto& table = font->loadAscii();
+    splitString<const wchar_t>(text, L'\n', 0, [&](size_t, util::span<const wchar_t> line) {
+        y += font->nativeSize() * lineHeight;
+        if (auto cs = strip(line, [](wchar_t c) { return c >= 256; })) {
+            long x = table[cs[0]].originX;
+            for (wchar_t c : cs) if (c < 256) {
+                RECT s = {table[c].x, table[c].y, table[c].x + table[c].w, table[c].y + table[c].h};
+                double tl = (x - table[c].originX) * scale + total.left
+                     , tt = (y - table[c].originY) * scale + total.top
+                     , tr = (x - table[c].originX + table[c].w) * scale + total.left
+                     , tb = (y - table[c].originY + table[c].h) * scale + total.top;
+                // Cancel out `QUADP`'s half-pixel compensation -- smoothness is what we want here.
+                ui::vertex quad[] = {QUADP(tl, tt, tr, tb, 0, s.left-.5, s.top-.5, s.right+.5, s.bottom+.5)};
+                quads.insert(quads.end(), std::begin(quad), std::end(quad));
+                x += table[c].advance;
+            }
+        }
+    });
+    // TODO pass color/texture to pixel shader
+    ctx.draw(target, font->loadTexture(ctx), quads, dirty, true);
 }

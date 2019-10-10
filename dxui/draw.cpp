@@ -5,13 +5,16 @@
 
 #pragma comment(lib, "shlwapi.lib")
 
+#include <dxui/id_vertex.h>
+#include <dxui/id_pixel.h>
+#include <dxui/id_distance_pixel.h>
+
 ui::dxcontext::dxcontext() {
     D3D_FEATURE_LEVEL level;
     D3D_FEATURE_LEVEL levels[] = {
         D3D_FEATURE_LEVEL_11_1,
         D3D_FEATURE_LEVEL_11_0,
         D3D_FEATURE_LEVEL_10_1,
-        D3D_FEATURE_LEVEL_10_0,
     };
     HRESULT hr = S_OK;
     for (auto driverType : {D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP}) {
@@ -28,6 +31,7 @@ ui::dxcontext::dxcontext() {
     };
     vertexId = COMe(ID3D11VertexShader, device->CreateVertexShader, g_id_vertex, ARRAYSIZE(g_id_vertex), nullptr);
     pixelId = COMe(ID3D11PixelShader, device->CreatePixelShader, g_id_pixel, ARRAYSIZE(g_id_pixel), nullptr);
+    pixelDistanceDecoder = COMe(ID3D11PixelShader, device->CreatePixelShader, g_id_distance_pixel, ARRAYSIZE(g_id_distance_pixel), nullptr);
     inputLayout = COMe(ID3D11InputLayout, device->CreateInputLayout, layout, ARRAYSIZE(layout), g_id_vertex, ARRAYSIZE(g_id_vertex));
     context->IASetInputLayout(inputLayout);
 
@@ -48,8 +52,8 @@ ui::dxcontext::dxcontext() {
     blend.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
     blend.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
     blend.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    blend.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    blend.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+    blend.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_SRC_ALPHA;
+    blend.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
     blend.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
     blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
     blendOver = COMe(ID3D11BlendState, device->CreateBlendState, &blend);
@@ -69,7 +73,6 @@ ui::dxcontext::dxcontext() {
 
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     context->VSSetShader(vertexId, nullptr, 0);
-    context->PSSetShader(pixelId, nullptr, 0);
     context->PSSetSamplers(0, 1, &linear);
     context->RSSetState(rState);
 
@@ -86,13 +89,15 @@ void ui::dxcontext::clear(ID3D11Texture2D* target, RECT area) {
     D3D11_VIEWPORT vp = {0, 0, (FLOAT)targetDesc.Width, (FLOAT)targetDesc.Height, 0, 1};
     context->RSSetViewports(1, &vp);
     context->RSSetScissorRects(1, &area);
+    context->PSSetShader(pixelId, nullptr, 0);
     context->OMSetBlendState(blendClear, nullptr, 0xFFFFFFFFU);
     context->OMSetRenderTargets(1, &rt, nullptr);
     context->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
     context->Draw(6, 0);
 }
 
-void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util::span<ui::vertex> vertices, RECT cull) {
+void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util::span<ui::vertex> vertices, RECT cull,
+                         bool distanceCoded) {
     D3D11_TEXTURE2D_DESC sourceDesc;
     D3D11_TEXTURE2D_DESC targetDesc;
     source->GetDesc(&sourceDesc);
@@ -108,11 +113,10 @@ void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util:
     auto vb = buffer(vertices.reinterpret<const uint8_t>(), D3D11_BIND_VERTEX_BUFFER);
     UINT stride = sizeof(vertex);
     UINT offset = 0;
-    if (sourceDesc.MiscFlags & D3D11_RESOURCE_MISC_GENERATE_MIPS)
-        context->GenerateMips(sr);
     D3D11_VIEWPORT vp = {0, 0, (FLOAT)targetDesc.Width, (FLOAT)targetDesc.Height, 0, 1};
     context->RSSetViewports(1, &vp);
     context->RSSetScissorRects(1, &cull);
+    context->PSSetShader(distanceCoded ? pixelDistanceDecoder : pixelId, nullptr, 0);
     context->OMSetBlendState(blendOver, nullptr, 0xFFFFFFFFU);
     context->OMSetRenderTargets(1, &rt, nullptr);
     context->PSSetShaderResources(0, 1, &sr);
@@ -141,10 +145,16 @@ winapi::com_ptr<ID3D11Texture2D> ui::dxcontext::textureFromPNG(util::span<const 
     desc.ArraySize = 1;
     desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     desc.SampleDesc.Count = 1;
-    desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     D3D11_SUBRESOURCE_DATA initData = {};
     initData.pSysMem = tmp.data();
     initData.SysMemPitch = width * 4;
-    return COMe(ID3D11Texture2D, device->CreateTexture2D, &desc, &initData);
+    auto initial = COMe(ID3D11Texture2D, device->CreateTexture2D, &desc, &initData);
+    desc.MipLevels = 0;
+    desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
+    desc.MiscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
+    auto mipmapped = COMe(ID3D11Texture2D, device->CreateTexture2D, &desc, nullptr);
+    copy(mipmapped, initial, {0, 0, (LONG)desc.Width, (LONG)desc.Height});
+    context->GenerateMips(COMe(ID3D11ShaderResourceView, device->CreateShaderResourceView, mipmapped, nullptr));
+    return mipmapped;
 }

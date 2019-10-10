@@ -15,11 +15,15 @@ int ui::main() {
     ui::spacer d{{50, 50}};
     ui::slider hs1, hs2;
     ui::slider vs1, vs2;
+    ui::font segoe{IDI_FONT_SEGOE_UI};
+    ui::label label1{segoe, 20, L"The quick brown fox jumps over the lazy dog."};
+    ui::label label2{segoe, 30, L"The quick brown fox jumps over the lazy dog."};
+    ui::label label3{segoe, 40, L"The quick brown fox jumps over the lazy dog."};
     hs1.setOrientation(ui::slider::deg0);
     vs1.setOrientation(ui::slider::deg90);
     hs2.setOrientation(ui::slider::deg180);
     vs2.setOrientation(ui::slider::deg270);
-    ui::grid grid{3, 3};
+    ui::grid grid{3, 6};
     grid.set(0, 0, &a);
     grid.set(1, 1, &c);
     grid.set(2, 2, &d);
@@ -29,6 +33,9 @@ int ui::main() {
     grid.set(0, 1, &vs2);
     grid.setColStretch(1, 1);
     grid.setRowStretch(1, 1);
+    grid.set(1, 3, &label1);
+    grid.set(1, 4, &label2);
+    grid.set(1, 5, &label3);
     auto window = ui::window(L"edgelight", cursor, iconLg, iconSm, 800, 600, WS_OVERLAPPEDWINDOW);
     auto onDestroy = window.onDestroy.add([&] { ui::quit(); return true; });
     auto set = [&](POINT p) {
@@ -58,7 +65,7 @@ int ui::main() {
     auto onChangeH1 = vs1.onChange.add(setH);
     auto onChangeH2 = vs2.onChange.add(setH);
     window.setRoot(&grid);
-    window.makeTransparent(0x20000000u);
+    window.makeTransparent(0x7f000000u);
     window.show();
     return ui::dispatch();
 }

@@ -69,7 +69,7 @@ namespace ui {
             if (parent) parent->onMouseCapture(w);
         }
 
-        virtual void onMouse(POINT abs, int keys) { }
+        virtual bool onMouse(POINT abs, int keys) { return false; }
         virtual void onMouseLeave() { }
 
     protected:
@@ -207,7 +207,7 @@ namespace ui {
         POINT measureMinEx() const override;
         POINT measureEx(POINT fit) const override;
         void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
-        void onMouse(POINT p, int keys) override;
+        bool onMouse(POINT p, int keys) override;
         void onMouseLeave() override;
 
     private:
@@ -308,10 +308,10 @@ namespace ui {
     struct button : texrect {
         using texrect::texrect;
 
-        void onMouse(POINT abs, int keys) override {
+        bool onMouse(POINT abs, int keys) override {
             bool hovering = rectHit(size(), relative(abs));
             switch (cap.update(keys)) {
-                case capture_state::ignore:  break;
+                case capture_state::ignore:  return false;
                 case capture_state::prepare: setState(hover); break;
                 case capture_state::capture: setState(active); captureMouse(true); break;
                 case capture_state::drag:    setState(hovering ? active : idle); break;
@@ -319,6 +319,7 @@ namespace ui {
                 // gives a little feedback that the click was actually registered.
                 case capture_state::release: setState(idle); captureMouse(false); if (hovering) onClick(); break;
             }
+            return true;
         }
 
         void onMouseLeave() override {
@@ -379,10 +380,10 @@ namespace ui {
             invalidate();
         }
 
-        void onMouse(POINT abs, int keys) override {
+        bool onMouse(POINT abs, int keys) override {
             switch (cap.update(keys)) {
-                case capture_state::ignore:
-                case capture_state::prepare: return;
+                case capture_state::ignore:  return false;
+                case capture_state::prepare: return true;
                 case capture_state::capture: captureMouse(true); break;
                 case capture_state::release: captureMouse(false); break;
             }
@@ -390,6 +391,7 @@ namespace ui {
             setValue(vertical() ? (relative(abs).y - h / 2.) / (size().y - h)
                                 : (relative(abs).x - w / 2.) / (size().x - w));
             onChange(value);
+            return true;
         }
 
         void onMouseLeave() override {
@@ -413,13 +415,77 @@ namespace ui {
         capture_state cap;
     };
 
-    struct label : widget {
-        label(std::wstring contents = L"")
-            : text(std::move(contents))
+    struct font_symbol {
+        uint16_t x;
+        uint16_t y;
+        uint16_t w;
+        uint16_t h;
+        uint16_t originX;
+        uint16_t originY;
+        uint16_t advance;
+    };
+
+    struct font {
+        font(ui::resource texture, ui::resource charmap)
+            : texture(ui::read(texture, L"PNG"))
+            , charmap(ui::read(charmap, L"TEXT").reinterpret<const char>())
         {}
 
-        void setText(std::wstring updated) {
-            text = std::move(updated);
+        font(int resourceId)
+            : font(ui::fromBundled(resourceId),
+                   ui::fromBundled(resourceId + 1))
+        {}
+
+        winapi::com_ptr<ID3D11Texture2D> loadTexture(ui::dxcontext& ctx) {
+            return ctx.textureFromPNG(texture);
+        }
+
+        // Return the native font size, i.e. the size of symbols in texture data.
+        // The text looks best at that size, although there is distance field
+        // based antialiasing.
+        int nativeSize() const;
+
+        // Load the ASCII symbols as an 256-element array. Symbols not available
+        // in the font have size and offset 0.
+        const font_symbol* loadAscii() const;
+
+    private:
+        util::span<const uint8_t> texture;
+        util::span<const char> charmap;
+        mutable std::vector<font_symbol> ascii;
+        mutable int nativeSize_ = -1;
+    };
+
+    struct label : widget {
+        label(ui::font& font, uint32_t fontSize, util::span<const wchar_t> contents = {})
+            : text(std::move(contents))
+            , font(&font)
+            , fontSize(fontSize)
+            , lineHeight(1.2)
+        {}
+
+        void setText(util::span<wchar_t> updated) {
+            text = updated;
+            invalidateSize();
+        }
+
+        void setFont(ui::font& f) {
+            font = &f;
+            invalidateSize();
+        }
+
+        void setFontSize(uint32_t sz) {
+            fontSize = sz;
+            invalidateSize();
+        }
+
+        void setFontColor(uint32_t color) {
+            fontColor = color;
+            invalidate();
+        }
+
+        void setLineHeight(double lh) {
+            lineHeight = lh;
             invalidateSize();
         }
 
@@ -429,6 +495,11 @@ namespace ui {
         void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
 
     private:
-        std::wstring text;
+        util::span<const wchar_t> text;
+        ui::font* font;
+        uint32_t fontSize;
+        uint32_t fontColor = 0xFF000000;
+        double lineHeight;
+        // TODO line alignment
     };
 }
