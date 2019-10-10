@@ -234,6 +234,7 @@ namespace ui {
     // A child widget is drawn into the `inner` part.
     //
     // TODO forward mouse events within the child widget's rectangle.
+    //
     struct texrect : widget {
         texrect(widget& child)
             : contents(&child, *this)
@@ -351,13 +352,22 @@ namespace ui {
     //     ----||--------------
     //
     // Values range from 0 to 1 inclusive.
+    //
     struct slider : widget {
         enum orientation { deg0, deg90, deg180, deg270 };
 
+        slider(double value = 0., orientation o = deg0)
+            : value(value)
+            , currentOrientation(o)
+        {}
+
         // Change the orientation of the slider, in degrees clockwise.
         //
-        // For 0 and 90 degrees, 0 is top-left and 1 is bottom-right. For 180 and 270,
-        // the range is inverted.
+        // NOTE: 0 is always top or left, and 1 is always bottom or right.
+        //       The difference between deg0 <-> deg180 and deg90 <-> deg270
+        //       is the orientation of textures, which may or may not be symmetric
+        //       depending on the IDI_WIDGETS resource.
+        //
         void setOrientation(orientation o) {
             currentOrientation = o;
             invalidateSize();
@@ -398,8 +408,27 @@ namespace ui {
         void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
 
     private:
-        double value = 0.0;
-        orientation currentOrientation = deg0;
+        double value;
+        orientation currentOrientation;
         capture_state cap;
+    };
+
+    struct label : widget {
+        label(std::wstring contents = L"")
+            : text(std::move(contents))
+        {}
+
+        void setText(std::wstring updated) {
+            text = std::move(updated);
+            invalidateSize();
+        }
+
+    private:
+        POINT measureMinEx() const override;
+        POINT measureEx(POINT) const override { return measureMin(); }
+        void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
+
+    private:
+        std::wstring text;
     };
 }
