@@ -112,33 +112,33 @@ static winapi::com_ptr<ID3D11Texture2D> builtinTexture(ui::dxcontext& ctx) {
     return ctx.textureFromPNG(resource);
 }
 
-static std::unordered_map<std::string_view, RECT> builtinRectsMap() {
-    auto resource = ui::read(ui::fromBundled(IDD_WIDGETS_RECTS), L"TEXT").reinterpret<const char>();
-    if (!resource)
-        throw std::runtime_error("IDD_WIDGETS_RECTS TEXT-type resource could nont be loaded");
-    std::unordered_map<std::string_view, RECT> result;
-    for (auto it = resource.data(), next = it; it != resource.end(); it = next) {
-        next = std::find(next, resource.end(), '\n');
-        if (next != resource.end())
-            next++;
-        // Ignore empty lines and comments (starting with whitespace and then `#`).
-        if (std::all_of(it, next, [](char c) { return isspace(c); }) || *it == '#')
-            continue;
-        // Expect 5 comma-separated columns with arbitrary whitespace around them.
-        const char* stops[5] = {it};
-        for (size_t i = 1; i < 5; stops[i++]++)
-            if ((stops[i] = std::find(stops[i - 1], next, ',')) == next)
-                throw std::runtime_error("IDD_WIDGETS_RECTS invalid data: " + std::string(it, next));
-        // x, y, width, height, name with optional whitespace
-        POINT p = {atol(stops[0]), atol(stops[1])};
-        POINT q = {atol(stops[2]), atol(stops[3])};
-        auto a = stops[4];
-        auto b = next;
-        while (a < b && isspace(a[ 0])) a++;
-        while (a < b && isspace(b[-1])) b--;
-        result.emplace(std::string_view(a, b - a), RECT{p.x, p.y, p.x + q.x, p.y + q.y});
+template <typename F /* = void(size_t, util::span<const char>) */>
+static void splitString(const char* start, const char* end, char sep, size_t limit, F&& f) {
+    for (size_t i = 0;; i++) {
+        auto next = i + 1 == limit ? end : std::find(start, end, sep);
+        f(i, util::span<const char>(start, next - start));
+        if (next == end)
+            break;
+        start = next + 1;
     }
-    return result;
+}
+
+template <size_t columns, typename F /* = void(util::span<const char>[columns]) */>
+static void readPseudoCSV(util::span<const char> resource, F&& f) {
+    splitString(resource.begin(), resource.end(), '\n', 0, [&](size_t, util::span<const char> line) {
+        // Ignore empty lines and comments (starting with whitespace and then `#`).
+        if (std::all_of(line.begin(), line.end(), [](char c) { return isspace(c); }) || line[0] == '#')
+            return;
+        util::span<const char> stripped[columns];
+        splitString(line.begin(), line.end(), ',', columns, [&](size_t i, util::span<const char> part) {
+            auto a = part.begin();
+            auto b = part.end();
+            while (a < b && isspace(a[ 0])) a++;
+            while (a < b && isspace(b[-1])) b--;
+            stripped[i] = util::span<const char>(a, b - a);
+        });
+        f(stripped);
+    });
 }
 
 enum builtin_rect {
@@ -156,7 +156,17 @@ enum builtin_rect {
 static RECT builtinRect(builtin_rect r) {
     static RECT rects[BUILTIN_RECT_COUNT];
     static int initialized = [&]{
-        auto map = builtinRectsMap();
+        auto resource = ui::read(ui::fromBundled(IDD_WIDGETS_RECTS), L"TEXT");
+        if (!resource)
+            throw std::runtime_error("IDD_WIDGETS_RECTS TEXT-type resource could nont be loaded");
+        std::unordered_map<std::string_view, RECT> map;
+        // x, y, width, height, name with optional whitespace
+        readPseudoCSV<5>(resource.reinterpret<const char>(), [&](util::span<const char> columns[5]) {
+            POINT p = {atol(columns[0].data()), atol(columns[1].data())};
+            POINT q = {atol(columns[2].data()), atol(columns[3].data())};
+            std::string_view name{columns[4].data(), columns[4].size()};
+            map.emplace(name, RECT{p.x, p.y, p.x + q.x, p.y + q.y});
+        });
         rects[BUTTON_OUTER]        = map.at("button outer");
         rects[BUTTON_OUTER_HOVER]  = map.at("button outer hover");
         rects[BUTTON_OUTER_ACTIVE] = map.at("button outer active");
@@ -253,4 +263,12 @@ void ui::slider::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total,
         QUADPR(tx, ty, tx + tw, ty + th, 0, ts.left, ts.top, ts.right, ts.bottom),
     };
     ctx.draw(target, ctx.cachedTexture<builtinTexture>(), rotate ? vquads : hquads, dirty);
+}
+
+POINT ui::label::measureMinEx() const {
+    return {0, 0}; // TODO
+}
+
+void ui::label::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
+    // TODO use DirectWrite or something.
 }
