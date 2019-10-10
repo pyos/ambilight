@@ -1,6 +1,6 @@
 #include "resource.hpp"
 
-util::span<uint8_t> ui::read(resource rs, const wchar_t* type) {
+util::span<const uint8_t> ui::read(resource rs, const wchar_t* type) {
     auto resInfo = FindResource(rs.first, rs.second, type);
     if (!resInfo)
         return {};

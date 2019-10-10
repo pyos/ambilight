@@ -102,7 +102,7 @@ namespace ui {
         void draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util::span<vertex> vertices, RECT cull);
 
         // Convert a PNG image into a BGRA 32-bit texture.
-        winapi::com_ptr<ID3D11Texture2D> textureFromPNG(util::span<uint8_t>);
+        winapi::com_ptr<ID3D11Texture2D> textureFromPNG(util::span<const uint8_t>);
 
         template <typename F /* = winapi::com_ptr<ID3D11Texture2D>() */>
         winapi::com_ptr<ID3D11Texture2D> cachedTexture(uintptr_t key, F&& gen) {

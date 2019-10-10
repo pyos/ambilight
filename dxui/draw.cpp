@@ -120,7 +120,7 @@ void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util:
     context->Draw(vertices.size(), 0);
 }
 
-winapi::com_ptr<ID3D11Texture2D> ui::dxcontext::textureFromPNG(util::span<uint8_t> in) {
+winapi::com_ptr<ID3D11Texture2D> ui::dxcontext::textureFromPNG(util::span<const uint8_t> in) {
     winapi::com_ptr<IStream> stream;
     *&stream = SHCreateMemStream(in.data(), in.size());
     auto dec = COMv(IWICBitmapDecoder, CoCreateInstance, CLSID_WICPngDecoder, nullptr, CLSCTX_INPROC_SERVER);
