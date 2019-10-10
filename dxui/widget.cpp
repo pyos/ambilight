@@ -112,15 +112,63 @@ static winapi::com_ptr<ID3D11Texture2D> builtinTexture(ui::dxcontext& ctx) {
     return ctx.textureFromPNG(resource);
 }
 
-static constexpr RECT
-    BUTTON_OUTER_NORMAL = { 0,  0, 23, 23},
-    BUTTON_INNER_NORMAL = {11, 11, 12, 12},
-    BUTTON_OUTER_HOVER  = { 0, 23, 23, 46},
-    BUTTON_INNER_HOVER  = {11, 34, 12, 35},
-    BUTTON_OUTER_ACTIVE = { 0, 46, 23, 69},
-    BUTTON_INNER_ACTIVE = {11, 57, 12, 58},
-    SLIDER_TRACK  = {23,  0, 38, 32},
-    SLIDER_GROOVE = {23, 32, 38, 35};
+static std::unordered_map<std::string_view, RECT> builtinRectsMap() {
+    auto resource = ui::read(ui::fromBundled(IDD_WIDGETS_RECTS), L"TEXT").reinterpret<const char>();
+    if (!resource)
+        throw std::runtime_error("IDD_WIDGETS_RECTS TEXT-type resource could nont be loaded");
+    std::unordered_map<std::string_view, RECT> result;
+    for (auto it = resource.data(), next = it; it != resource.end(); it = next) {
+        next = std::find(next, resource.end(), '\n');
+        if (next != resource.end())
+            next++;
+        // Ignore empty lines and comments (starting with whitespace and then `#`).
+        if (std::all_of(it, next, [](char c) { return isspace(c); }) || *it == '#')
+            continue;
+        // Expect 5 comma-separated columns with arbitrary whitespace around them.
+        const char* stops[5] = {it};
+        for (size_t i = 1; i < 5; stops[i++]++)
+            if ((stops[i] = std::find(stops[i - 1], next, ',')) == next)
+                throw std::runtime_error("IDD_WIDGETS_RECTS invalid data: " + std::string(it, next));
+        // x, y, width, height, name with optional whitespace
+        POINT p = {atol(stops[0]), atol(stops[1])};
+        POINT q = {atol(stops[2]), atol(stops[3])};
+        auto a = stops[4];
+        auto b = next;
+        while (a < b && isspace(a[ 0])) a++;
+        while (a < b && isspace(b[-1])) b--;
+        result.emplace(std::string_view(a, b - a), RECT{p.x, p.y, p.x + q.x, p.y + q.y});
+    }
+    return result;
+}
+
+enum builtin_rect {
+    BUTTON_OUTER,
+    BUTTON_OUTER_HOVER,
+    BUTTON_OUTER_ACTIVE,
+    BUTTON_INNER,
+    BUTTON_INNER_HOVER,
+    BUTTON_INNER_ACTIVE,
+    SLIDER_TRACK,
+    SLIDER_GROOVE,
+    BUILTIN_RECT_COUNT
+};
+
+static RECT builtinRect(builtin_rect r) {
+    static RECT rects[BUILTIN_RECT_COUNT];
+    static int initialized = [&]{
+        auto map = builtinRectsMap();
+        rects[BUTTON_OUTER]        = map.at("button outer");
+        rects[BUTTON_OUTER_HOVER]  = map.at("button outer hover");
+        rects[BUTTON_OUTER_ACTIVE] = map.at("button outer active");
+        rects[BUTTON_INNER]        = map.at("button inner");
+        rects[BUTTON_INNER_HOVER]  = map.at("button inner hover");
+        rects[BUTTON_INNER_ACTIVE] = map.at("button inner active");
+        rects[SLIDER_TRACK]        = map.at("slider track");
+        rects[SLIDER_GROOVE]       = map.at("slider groove");
+        return 0;
+    }();
+    return rects[r];
+};
 
 void ui::texrect::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
     auto [ol, ot, or, ob] = getOuter();
@@ -152,34 +200,35 @@ winapi::com_ptr<ID3D11Texture2D> ui::button::getTexture(ui::dxcontext& ctx) cons
 
 RECT ui::button::getOuter() const {
     switch (currentState) {
-        default: return BUTTON_OUTER_NORMAL;
-        case hover: return BUTTON_OUTER_HOVER;
-        case active: return BUTTON_OUTER_ACTIVE;
+        default:     return builtinRect(BUTTON_OUTER);
+        case hover:  return builtinRect(BUTTON_OUTER_HOVER);
+        case active: return builtinRect(BUTTON_OUTER_ACTIVE);
     }
 }
 
 RECT ui::button::getInner() const {
     switch (currentState) {
-        default: return BUTTON_INNER_NORMAL;
-        case hover: return BUTTON_INNER_HOVER;
-        case active: return BUTTON_INNER_ACTIVE;
+        default:     return builtinRect(BUTTON_INNER);
+        case hover:  return builtinRect(BUTTON_INNER_HOVER);
+        case active: return builtinRect(BUTTON_INNER_ACTIVE);
     }
 }
 
 POINT ui::slider::measureMinEx() const {
-    auto w = SLIDER_TRACK.right - SLIDER_TRACK.left;
-    auto h = SLIDER_TRACK.bottom - SLIDER_TRACK.top;
-    return vertical() ? POINT{h, w} : POINT{w, h};
+    auto ts = builtinRect(SLIDER_TRACK);
+    return {vertical() ? ts.bottom - ts.top : ts.right - ts.left,
+            vertical() ? ts.right - ts.left : ts.bottom - ts.top};
 }
 
 POINT ui::slider::measureEx(POINT fit) const {
-    auto h = SLIDER_TRACK.bottom - SLIDER_TRACK.top;
-    return vertical() ? POINT{h, fit.y} : POINT{fit.x, h};
+    auto ts = builtinRect(SLIDER_TRACK);
+    return {vertical() ? ts.bottom - ts.top : fit.x,
+            vertical() ? fit.y : ts.bottom - ts.top};
 }
 
 void ui::slider::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
-    RECT gs = SLIDER_GROOVE;
-    RECT ts = SLIDER_TRACK;
+    auto gs = builtinRect(SLIDER_GROOVE);
+    auto ts = builtinRect(SLIDER_TRACK);
     auto [tw, th] = measureMin();            // Horizontal:          Vertical:
     auto aw = total.right - total.left - tw; // Groove length        Track left offset
     auto ah = total.bottom - total.top - th; // Track top offset     Groove length

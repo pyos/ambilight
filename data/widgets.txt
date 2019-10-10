@@ -1,0 +1,11 @@
+# x,   y,   w,   h,   name
+
+  0,   0,   23,  23,  button outer
+  0,  23,   23,  23,  button outer hover
+  0,  46,   23,  23,  button outer active
+ 11,  11,    1,   1,  button inner
+ 11,  34,    1,   1,  button inner hover
+ 11,  57,    1,   1,  button inner active
+
+ 23,   0,   15,  32,  slider track
+ 23,  32,   15,   3,  slider groove

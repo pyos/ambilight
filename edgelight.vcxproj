@@ -110,6 +110,7 @@
     <ResourceCompile Include="edgelight.rc" />
     <Image Include="data\app.ico" />
     <Image Include="data\widgets.png" />
+    <EmbeddedResource Include="data\widgets.txt" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
