@@ -11,7 +11,7 @@ namespace ui {
     struct widget_parent {
         virtual void onChildRedraw(widget&, RECT) = 0;
         virtual void onChildResize(widget&) = 0;
-        virtual void onMouseCapture(widget*) = 0;
+        virtual void onMouseCapture(widget&) = 0;
     };
 
     struct widget : widget_parent {
@@ -65,7 +65,7 @@ namespace ui {
             invalidateSize();
         }
 
-        void onMouseCapture(widget* w) override {
+        void onMouseCapture(widget& w) override {
             if (parent) parent->onMouseCapture(w);
         }
 
@@ -92,12 +92,14 @@ namespace ui {
             if (parent) parent->onChildResize(*this);
         }
 
-        // Begin or end capturing the pointer into this widget.
+        // Begin capturing the pointer into this widget. The capture is released
+        // the first time the widget refuses to capture a mouse event, i.e. returns
+        // `false` from `onMouse`.
         //
         // NOTE: releasing the pointer while it's outside the widget's boundaries
         //       does not send an `onMouseLeave` message until the next mouse action.
-        void captureMouse(bool yes) {
-            if (parent) parent->onMouseCapture(yes ? this : nullptr);
+        void captureMouse() {
+            if (parent) parent->onMouseCapture(*this);
         }
 
         // Map a point from window coordinates to widget coordinates, which are just
@@ -278,9 +280,9 @@ namespace ui {
         // Call this in the widget's `onMouse` handler. Return values:
         //     ignore     hovering with a button held from outside
         //     prepare    hovering with no buttons held
-        //     capture    pressed a button, call `captureMouse(true)`
-        //     drag       still holding a button
-        //     release    released all buttons, call `captureMouse(false)`
+        //     capture    pressed a button, call `captureMouse()` and return `true`
+        //     drag       still holding a button, keep returning `true`
+        //     release    released all buttons, return `false`
         enum { ignore, prepare, capture, drag, release } update(int keys) {
             static const int MK_ANY = MK_LBUTTON | MK_RBUTTON | MK_MBUTTON | MK_XBUTTON1 | MK_XBUTTON2;
             bool a = capturing;
@@ -312,14 +314,14 @@ namespace ui {
             bool hovering = rectHit(size(), relative(abs));
             switch (cap.update(keys)) {
                 case capture_state::ignore:  return false;
-                case capture_state::prepare: setState(hover); break;
-                case capture_state::capture: setState(active); captureMouse(true); break;
-                case capture_state::drag:    setState(hovering ? active : idle); break;
+                case capture_state::prepare: setState(hover); return false;
+                case capture_state::capture: setState(active); captureMouse(); return true;
+                case capture_state::drag:    setState(hovering ? active : idle); return true;
                 // Unconditionally switching to `idle` even when hovering over the button
                 // gives a little feedback that the click was actually registered.
-                case capture_state::release: setState(idle); captureMouse(false); if (hovering) onClick(); break;
+                case capture_state::release: setState(idle); if (hovering) onClick(); return false;
             }
-            return true;
+            return false;
         }
 
         void onMouseLeave() override {
@@ -381,17 +383,18 @@ namespace ui {
         }
 
         bool onMouse(POINT abs, int keys) override {
+            bool keepCapturing = true;
             switch (cap.update(keys)) {
-                case capture_state::ignore:  return false;
-                case capture_state::prepare: return true;
-                case capture_state::capture: captureMouse(true); break;
-                case capture_state::release: captureMouse(false); break;
+                case capture_state::ignore:
+                case capture_state::prepare: return false;
+                case capture_state::capture: captureMouse(); break;
+                case capture_state::release: keepCapturing = false; break;
             }
             auto [w, h] = measureMin();
             setValue(vertical() ? (relative(abs).y - h / 2.) / (size().y - h)
                                 : (relative(abs).x - w / 2.) / (size().x - w));
             onChange(value);
-            return true;
+            return keepCapturing;
         }
 
         void onMouseLeave() override {

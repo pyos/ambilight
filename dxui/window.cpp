@@ -220,31 +220,52 @@ void ui::window::drawScheduled() {
     auto target = COMv(ID3D11Texture2D, swapChain->GetBuffer, 0);
     // We're in flip mode, so the current back buffer contains outdated state.
     // TODO don't draw the intersection twice
-    context.clear(target, lastPainted);
+    context.clear(target, lastPainted, background);
     if (root) root->draw(context, target, {0, 0, (LONG)w, (LONG)h}, lastPainted);
-    context.clear(target, scheduled);
+    context.clear(target, scheduled, background);
     if (root) root->draw(context, target, {0, 0, (LONG)w, (LONG)h}, scheduled);
     lastPainted = scheduled;
     winapi::throwOnFalse(swapChain->Present(1, 0));
 }
 
-void ui::window::makeTransparent(uint32_t tint) {
+void ui::window::setBackground(uint32_t tint) {
     ACCENT_POLICY ap = {};
-    ap.AccentState = ACCENT_ENABLE_BLURBEHIND;
-    ap.AccentFlags = 2;
-    ap.GradientColor = tint;
+    if ((tint >> 24) != 0xFF) {
+        ap.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
+        ap.AccentFlags = 2;
+        // This value should be ABGR, not ARGB.
+        ap.GradientColor = tint & 0xFF00FF00u | (tint & 0xFF) << 16 | (tint & 0xFF0000) >> 16;
+        background = 0;
+    } else {
+        background = tint;
+    }
     WINCOMPATTRDATA ca;
     ca.Attrib = WCA_ACCENT_POLICY;
     ca.pvData = &ap;
     ca.cbData = sizeof(ap);
     winapi::throwOnFalse(SetWindowCompositionAttribute(*this, &ca));
+    //SetWindowLongPtr(*this, GWL_STYLE, WS_BORDER);
 }
 
-void ui::window::makeOpaque() {
-    ACCENT_POLICY ap = {};
-    WINCOMPATTRDATA ca;
-    ca.Attrib = WCA_ACCENT_POLICY;
-    ca.pvData = &ap;
-    ca.cbData = sizeof(ap);
-    winapi::throwOnFalse(SetWindowCompositionAttribute(*this, &ca));
+void ui::window::onMouse(POINT abs, int keys) {
+    if (mouseCapture) {
+        if (!mouseCapture->onMouse(abs, keys)) {
+            mouseCapture = nullptr;
+            ReleaseCapture();
+        }
+    } else if ((!root || !root->onMouse(abs, keys))) {
+        if (!(keys & MK_LBUTTON)) {
+            dragBy = {-1, -1};
+        } else if (dragBy.x >= 0 && dragBy.y >= 0) {
+            RECT rect;
+            GetWindowRect(*this, &rect);
+            // `abs` is actually relative to the window, so moving the window also moves
+            // the coordinate frame. That's why we *don't* update `dragBy` here; effectively,
+            // this code is keeping `abs` at a constant value.
+            MoveWindow(*this, rect.left + abs.x - dragBy.x, rect.top + abs.y - dragBy.y,
+                       rect.right - rect.left, rect.bottom - rect.top, TRUE);
+        } else if (dragByEmptyAreas) {
+            dragBy = abs;
+        }
+    }
 }

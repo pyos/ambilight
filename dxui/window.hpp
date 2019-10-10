@@ -32,11 +32,15 @@ namespace ui {
         // Whether the window is visible, i.e. not hidden or minimized.
         bool isVisible() { return IsWindowVisible(*this); }
 
-        // Make this window transparent with a given ABGR tint. Must be done while the window is hidden.
-        void makeTransparent(uint32_t tint = 0x00000000u);
+        // Set the background of the window, in ARGB format. Default is white.
+        // Transparent colors use the Windows 10 acrylic blur effect.
+        void setBackground(uint32_t tint);
 
-        // Make this window opaque. Must be done while the window is hidden.
-        void makeOpaque();
+        // Enable or disable the ability to drag the window by any area that does not
+        // handle mouse clicks otherwise.
+        void setDragByEmptyAreas(bool value) {
+            dragByEmptyAreas = value;
+        }
 
         widget* getRoot() const { return root.get(); }
 
@@ -55,12 +59,7 @@ namespace ui {
         // Redraw the scheduled areas now.
         void drawScheduled();
 
-        void onMouse(POINT abs, int keys) {
-            if (mouseCapture)
-                mouseCapture->onMouse(abs, keys);
-            else if (root)
-                root->onMouse(abs, keys);
-        }
+        void onMouse(POINT abs, int keys);
 
     public:
         // Fired when the window becomes visible because of a call to `show()` or because
@@ -85,13 +84,10 @@ namespace ui {
 
         void onChildRedraw(widget&, RECT area) override { draw(area); }
         void onChildResize(widget&) override { draw(); }
-        void onMouseCapture(widget* target) override {
-            // assert(!!mouseCapture == !target);
-            if ((mouseCapture = target)) {
-                SetCapture(*this);
-            } else {
-                ReleaseCapture();
-            }
+        void onMouseCapture(widget& target) override {
+            // assert(!mouseCapture);
+            mouseCapture = &target;
+            SetCapture(*this);
         }
 
     private:
@@ -106,5 +102,8 @@ namespace ui {
         winapi::com_ptr<IDCompositionVisual> visual;
         UINT w = 1, h = 1;
         RECT lastPainted = {0, 0, 0, 0};
+        uint32_t background = 0xFFFFFFFFu;
+        bool dragByEmptyAreas = true;
+        POINT dragBy = {-1, -1};
     };
 }

@@ -348,6 +348,8 @@ void ui::label::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, 
             }
         }
     });
+    for (auto& vertex : quads)
+        vertex.clr = ARGB2CLR(fontColor);
     // TODO pass color/texture to pixel shader
     ctx.draw(target, font->loadTexture(ctx), quads, dirty, true);
 }

@@ -17,8 +17,8 @@
 //     ui::vertex vs[] = {QUAD(...)};
 //
 #define QUAD(L, T, R, B, Z, tL, tT, tR, tB) \
-    {{L, B, Z}, {tL, tB}}, {{L, T, Z}, {tL, tT}}, {{R, B, Z}, {tR, tB}}, \
-    {{R, B, Z}, {tR, tB}}, {{L, T, Z}, {tL, tT}}, {{R, T, Z}, {tR, tT}}
+    {{L, B, Z}, {}, {tL, tB}}, {{L, T, Z}, {}, {tL, tT}}, {{R, B, Z}, {}, {tR, tB}}, \
+    {{R, B, Z}, {}, {tR, tB}}, {{L, T, Z}, {}, {tL, tT}}, {{R, T, Z}, {}, {tR, tT}}
 
 // Same as `QUAD`, but the texture rectangle is rotated 90 degrees clockwise.
 //
@@ -27,8 +27,8 @@
 //       a 270 degree rotation.
 //
 #define QUADR(L, T, R, B, Z, tL, tT, tR, tB) \
-    {{L, B, Z}, {tR, tB}}, {{L, T, Z}, {tL, tB}}, {{R, B, Z}, {tR, tT}}, \
-    {{R, B, Z}, {tR, tT}}, {{L, T, Z}, {tL, tB}}, {{R, T, Z}, {tL, tT}}
+    {{L, B, Z}, {}, {tR, tB}}, {{L, T, Z}, {}, {tL, tB}}, {{R, B, Z}, {}, {tR, tT}}, \
+    {{R, B, Z}, {}, {tR, tT}}, {{L, T, Z}, {}, {tL, tB}}, {{R, T, Z}, {}, {tL, tT}}
 
 // Same as `QUAD`, but all coordinates are in pixels. These are suitable
 // for passing to `ui::dxcontext::draw`.
@@ -39,6 +39,13 @@
 // but the texture rectangle is rotated 90 degrees clockwise.
 #define QUADPR(L, T, R, B, Z, tL, tT, tR, tB) \
     QUADR((float)(L), (float)(T), (float)(R), (float)(B), Z, (float)(tL)+.5f, (float)(tT)+.5f, (float)(tR)-.5f, (float)(tB)-.5f)
+
+// Convert an A8R8G8B8 color into R32G32B32A32 used by the shaders.
+#define ARGB2CLR(u) \
+    (DirectX::XMFLOAT4{ \
+        (uint8_t)((u) >> 16) / 255.f, (uint8_t)((u) >> 8)  / 255.f, \
+        (uint8_t)((u))       / 255.f, (uint8_t)((u) >> 24) / 255.f, \
+    })
 
 namespace ui {
     // The identity rectangle:
@@ -75,6 +82,7 @@ namespace ui {
 
     struct vertex {
         DirectX::XMFLOAT3 pos;
+        DirectX::XMFLOAT4 clr;
         DirectX::XMFLOAT2 tex;
     };
 
@@ -91,8 +99,8 @@ namespace ui {
             context->CopySubresourceRegion(target, to.x, to.y, 0, 0, source, 0, &box);
         }
 
-        // Clear a region of a texture and.
-        void clear(ID3D11Texture2D* target, RECT);
+        // Clear a region of a texture, setting all pixels in it to the specified ARGB color.
+        void clear(ID3D11Texture2D* target, RECT, uint32_t color = 0);
 
         // Draw a textured object onto a surface. Vertex coordinates must be given in pixels;
         // calling this function will transform them into UV.
@@ -132,6 +140,7 @@ namespace ui {
         winapi::com_ptr<ID3D11DeviceContext> context;
         winapi::com_ptr<ID3D11VertexShader> vertexId;
         winapi::com_ptr<ID3D11PixelShader> pixelId;
+        winapi::com_ptr<ID3D11PixelShader> colorId;
         winapi::com_ptr<ID3D11PixelShader> pixelDistanceDecoder;
         winapi::com_ptr<ID3D11InputLayout> inputLayout;
         winapi::com_ptr<ID3D11SamplerState> linear;

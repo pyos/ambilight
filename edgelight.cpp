@@ -15,14 +15,17 @@ int ui::main() {
     ui::spacer d{{50, 50}};
     ui::slider hs1, hs2;
     ui::slider vs1, vs2;
-    ui::font segoe{IDI_FONT_SEGOE_UI};
-    ui::label label1{segoe, 20, L"The quick brown fox jumps over the lazy dog."};
-    ui::label label2{segoe, 30, L"The quick brown fox jumps over the lazy dog."};
-    ui::label label3{segoe, 40, L"The quick brown fox jumps over the lazy dog."};
     hs1.setOrientation(ui::slider::deg0);
     vs1.setOrientation(ui::slider::deg90);
     hs2.setOrientation(ui::slider::deg180);
     vs2.setOrientation(ui::slider::deg270);
+    ui::font segoe{IDI_FONT_SEGOE_UI};
+    ui::label label1{segoe, 20, L"The quick brown fox jumps over the lazy dog."};
+    ui::label label2{segoe, 30, L"The quick brown fox jumps over the lazy dog."};
+    ui::label label3{segoe, 40, L"The quick brown fox jumps over the lazy dog."};
+    label1.setFontColor(0xFFFFAAAAu);
+    label2.setFontColor(0xFFAAFFAAu);
+    label3.setFontColor(0xFFAAAAFFu);
     ui::grid grid{3, 6};
     grid.set(0, 0, &a);
     grid.set(1, 1, &c);
@@ -65,7 +68,7 @@ int ui::main() {
     auto onChangeH1 = vs1.onChange.add(setH);
     auto onChangeH2 = vs2.onChange.add(setH);
     window.setRoot(&grid);
-    window.makeTransparent(0x7f000000u);
+    window.setBackground(0x7f000000u);
     window.show();
     return ui::dispatch();
 }
