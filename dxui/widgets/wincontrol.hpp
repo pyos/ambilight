@@ -1,6 +1,7 @@
 #pragma once
 
 #include "button.hpp"
+#include "grid.hpp"
 #include "../window.hpp"
 
 namespace ui {
@@ -23,6 +24,7 @@ namespace ui {
     }
 
     DXUI_GENERATE_BUTTON(win_close, target.close());
+    DXUI_GENERATE_BUTTON(win_maximize, target.isMaximized() ? target.show() : target.maximize());
     DXUI_GENERATE_BUTTON(win_minimize, target.minimize());
 
 #undef DXUI_GENERATE_BUTTON

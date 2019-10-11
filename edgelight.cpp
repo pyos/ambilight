@@ -49,7 +49,7 @@ int ui::main() {
     grid.set(2, 2, &vs1);
     grid.set(1, 3, &hs2);
     grid.set(0, 2, &vs2);
-    grid.setColStretch(2, 1);
+    grid.setColStretch(1, 1);
     grid.setRowStretch(2, 1);
     grid.set(1, 4, &label);
     auto set = [&](POINT p) {
@@ -88,15 +88,17 @@ int ui::main() {
     mainContentWithPadding.setRowStretch(1, 1);
     mainContentWithPadding.setColStretch(1, 1);
 
-    ui::grid titlebar{4, 1};
+    ui::grid titlebar{5, 1};
     ui::spacer titleLeftPad{{10, 1}};
     ui::label title{{{L"DXUI test application", segoe, 16, 0xFFFFFFFFu, false}}};
     ui::win_minimize titlebarMinimize{window};
+    ui::win_maximize titlebarMaximize{window};
     ui::win_close titlebarClose{window};
     titlebar.set(0, 0, &titleLeftPad);
     titlebar.set(1, 0, &title, ui::grid::align_start);
     titlebar.set(2, 0, &titlebarMinimize);
-    titlebar.set(3, 0, &titlebarClose);
+    titlebar.set(3, 0, &titlebarMaximize);
+    titlebar.set(4, 0, &titlebarClose);
     titlebar.setColStretch(1, 1);
 
     ui::grid mainContentWithTitlebar{1, 2};
@@ -106,7 +108,7 @@ int ui::main() {
     mainContentWithTitlebar.setColStretch(0, 1);
     window.setRoot(&mainContentWithTitlebar);
 
-    window.setBackground(0x7f000000u);
+    window.setBackground(0x7F000000u);
     window.show();
     return ui::dispatch();
 }

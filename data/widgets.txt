@@ -1,28 +1,28 @@
 # x,   y,   w,   h,   name
-
+# buttons
   0,   0,   22,  22,  button outer
   0,  22,   22,  22,  button outer hover
   0,  44,   22,  22,  button outer active
  11,  11,    0,   0,  button inner
  11,  33,    0,   0,  button inner hover
  11,  55,    0,   0,  button inner active
-
+# sliders
  22,   0,   15,  32,  slider track
  22,  32,   15,   3,  slider groove
-
+# titlebar
  38,   0,   44,  24,  window close button outer
  38,  24,   44,  24,  window close button outer hover
  38,  48,   44,  24,  window close button outer active
  60,  12,    0,   0,  window close button inner
  60,  36,    0,   0,  window close button inner hover
  60,  60,    0,   0,  window close button inner active
- 82,   0,   44,  24,  window frame button outer
+ 38,   0,   44,  24,  window frame button outer
  82,  24,   44,  24,  window frame button outer hover
  82,  48,   44,  24,  window frame button outer active
-104,  12,    0,   0,  window frame button inner
+ 60,  12,    0,   0,  window frame button inner
 104,  36,    0,   0,  window frame button inner hover
 104,  60,    0,   0,  window frame button inner active
  22,  35,   16,  16,  window icon close
- 22,  51,   16,  16,  window icon maximize
- 22,  67,   16,  16,  window icon unmaximize
-  6,  66,   16,  16,  window icon minimize
+ 82,   0,   16,  16,  window icon maximize
+ 98,   0,   16,  16,  window icon unmaximize
+ 22,  51,   16,  16,  window icon minimize
