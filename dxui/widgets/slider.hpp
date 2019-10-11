@@ -37,17 +37,15 @@ namespace ui {
 
         // Set the current value, first remapping its interval to [0, 1].
         template <typename T>
-        void setValue(T min, T max, double v) {
-            setValue((v - min) / (max - min));
+        void setValue(T v, T min, T max, T step = 1) {
+            setValue((double)(v - v % step - min) / (max - min));
         }
 
-        // Map the current value from [0, 1] to an integer range [min, max]
-        // and update the slider's value to represent the returned one.
+        // Map the current value from [0, 1] to an integer range [min, max].
         template <typename T>
-        T mapToInt(T min, T max) {
-            T r = (T)(value * (max - min) + min + .5 /* round to closest */);
-            setValue(min, max, r);
-            return r;
+        T mapValue(T min, T max, T step = 1) {
+            T r = (T)(value * (max - min) + min + step / 2. /* round to closest */);
+            return r - r % step;
         }
 
         bool onMouse(POINT abs, int keys) override {
