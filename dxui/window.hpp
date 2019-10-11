@@ -55,9 +55,7 @@ namespace ui {
 
         // Enable or disable the ability to drag the window by any area that does not
         // handle mouse clicks otherwise.
-        void setDragByEmptyAreas(bool value) {
-            dragByEmptyAreas = value;
-        }
+        void setDragByEmptyAreas(bool value) { dragByEmptyAreas = value; }
 
         widget* getRoot() const { return root.get(); }
 

@@ -261,9 +261,7 @@ void ui::window::onMouse(POINT abs, int keys) {
             ReleaseCapture();
         }
     } else if ((!root || !root->onMouse(abs, keys))) {
-        if (!(keys & MK_LBUTTON)) {
-            dragBy = {-1, -1};
-        } else if (dragBy.x >= 0 && dragBy.y >= 0) {
+        if (dragBy.x >= 0 && dragBy.y >= 0) {
             RECT rect;
             GetWindowRect(*this, &rect);
             // `abs` is actually relative to the window, so moving the window also moves
@@ -271,8 +269,13 @@ void ui::window::onMouse(POINT abs, int keys) {
             // this code is keeping `abs` at a constant value.
             MoveWindow(*this, rect.left + abs.x - dragBy.x, rect.top + abs.y - dragBy.y,
                        rect.right - rect.left, rect.bottom - rect.top, TRUE);
-        } else if (dragByEmptyAreas) {
+            if (!(keys & MK_LBUTTON)) {
+                dragBy = {-1, -1};
+                ReleaseCapture();
+            }
+        } else if (dragByEmptyAreas && (keys & MK_LBUTTON)) {
             dragBy = abs;
+            SetCapture(*this);
         }
     }
 }
