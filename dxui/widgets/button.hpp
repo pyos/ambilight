@@ -36,17 +36,18 @@ namespace ui {
         // Emitted when the left mouse button is released over this widget.
         util::event<> onClick;
 
-    private:
+    protected:
         enum state { idle, hover, active };
+        state getState() const { return currentState; }
+        winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const override;
+        RECT getOuter() const override;
+        RECT getInner() const override;
+
+    private:
         void setState(state s) {
             if (currentState != s)
                 currentState = s, invalidate();
         }
-
-    protected:
-        winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const override;
-        RECT getOuter() const override;
-        RECT getInner() const override;
 
     private:
         state currentState = idle;

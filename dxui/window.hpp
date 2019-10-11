@@ -14,28 +14,40 @@ namespace ui {
     //     auto cursor = ui::loadDefaultCursor();
     //     auto iconSm = ui::loadSmallIcon(...);
     //     auto iconLg = ui::loadNormalIcon(...);
-    //     auto window = ui::window{L"unique class name", cursor, igonLg, iconSm, 800, 600, WS_OVERLAPPEDWINDOW};
+    //     auto window = ui::window{L"unique class name", cursor, igonLg, iconSm, 800, 600};
     //     window.draw(someWidget);
     //
     // NOTE: the window is initially hidden.
     //
     struct window : private widget_parent {
-        window(const wchar_t* name, cursor& cursor, icon& iconLg, icon& iconSm, int w, int h, int style);
+        window(const wchar_t* name, cursor& cursor, icon& iconLg, icon& iconSm, int w, int h);
 
         // Cast this window to a raw WinAPI handle.
         operator HWND() const { return handle.get(); }
 
-        // Show this window.
+        // Show this window. If it is visible and maximized, restore it to the original size.
         void show() {
             drawImmediate({0, 0, (LONG)w, (LONG)h});
             ShowWindow(*this, SW_SHOWNORMAL);
         }
 
-        // Hide (not minimize) this window.
+        // Maximize this window.
+        void maximize() { ShowWindow(*this, SW_SHOWMAXIMIZED); }
+
+        // Minimize this window.
+        void minimize() { ShowWindow(*this, SW_SHOWMINIMIZED); }
+
+        // Minimize this window and hide it from the task bar.
         void hide() { ShowWindow(*this, SW_HIDE); }
+
+        // Close this window.
+        void close() { SendMessage(*this, WM_CLOSE, 0, 0); }
 
         // Whether the window is visible, i.e. not hidden or minimized.
         bool isVisible() { return IsWindowVisible(*this); }
+
+        // Whether this window is maximized, duh.
+        bool isMaximized() { return IsZoomed(*this); }
 
         // Set the background of the window, in ARGB format. Default is white.
         // Transparent colors use the Windows 10 acrylic blur effect.

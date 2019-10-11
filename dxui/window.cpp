@@ -138,11 +138,13 @@ static LRESULT windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
                 window->drawImmediate(scheduled);
             break;
         }
+        case WM_NCCALCSIZE:
+            return 0;
     }
     return DefWindowProc(handle, msg, wParam, lParam);
 }
 
-ui::window::window(const wchar_t* name, cursor& cursor, icon& iconLg, icon& iconSm, int w, int h, int style) {
+ui::window::window(const wchar_t* name, cursor& cursor, icon& iconLg, icon& iconSm, int w, int h) {
     WNDCLASSEX wc = {};
     wc.cbSize        = sizeof(WNDCLASSEX);
     wc.lpszClassName = name;
@@ -155,13 +157,10 @@ ui::window::window(const wchar_t* name, cursor& cursor, icon& iconLg, icon& icon
     wc.style         = CS_HREDRAW | CS_VREDRAW;
     winapi::throwOnFalse(RegisterClassEx(&wc));
     wclass.reset(name);
-    RECT r = {0, 0, w, h};
-    winapi::throwOnFalse(AdjustWindowRect(&r, style, FALSE));
-    handle.reset(CreateWindowEx(WS_EX_COMPOSITED, name, L"", style, CW_USEDEFAULT, CW_USEDEFAULT,
-        r.right - r.left, r.bottom - r.top, nullptr, nullptr, impl::hInstance, nullptr));
+    handle.reset(CreateWindowEx(0, name, L"", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+        w, h, nullptr, nullptr, impl::hInstance, nullptr));
     winapi::throwOnFalse(handle);
     SetWindowLongPtr(*this, GWLP_USERDATA, (LONG_PTR)this);
-    SetWindowLongPtr(*this, GWL_STYLE, style);
 
     auto dxgiDevice = COMi(IDXGIDevice, context.raw()->QueryInterface);
     auto dxgiAdapter = COMi(IDXGIAdapter, dxgiDevice->GetParent);

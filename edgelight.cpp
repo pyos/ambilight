@@ -6,16 +6,18 @@
 #include "dxui/widgets/label.hpp"
 #include "dxui/widgets/slider.hpp"
 #include "dxui/widgets/spacer.hpp"
+#include "dxui/widgets/wincontrol.hpp"
 
 int ui::main() {
     auto asd = ui::read(ui::fromBundled(IDI_WIDGETS), L"PNG");
     auto cursor = ui::loadCursor(ui::fromFile(IDC_ARROW));
     auto iconLg = ui::loadNormalIcon(ui::fromBundled(IDI_APP));
     auto iconSm = ui::loadSmallIcon(ui::fromBundled(IDI_APP));
-    ui::spacer a{{50, 50}};
+    ui::window window{L"edgelight", cursor, iconLg, iconSm, 800, 600};
+    auto onDestroy = window.onDestroy.add([&] { ui::quit(); return true; });
+
     ui::spacer b{{50, 50}};
     ui::button c{b};
-    ui::spacer d{{50, 50}};
     ui::slider hs1, hs2;
     ui::slider vs1, vs2;
     hs1.setOrientation(ui::slider::deg0);
@@ -42,9 +44,7 @@ int ui::main() {
     }};
     ui::grid grid{3, 5};
     grid.set(1, 0, &heading, ui::grid::align_start);
-    grid.set(0, 1, &a);
     grid.set(1, 2, &c);
-    grid.set(2, 3, &d);
     grid.set(1, 1, &hs1);
     grid.set(2, 2, &vs1);
     grid.set(1, 3, &hs2);
@@ -52,8 +52,6 @@ int ui::main() {
     grid.setColStretch(2, 1);
     grid.setRowStretch(2, 1);
     grid.set(1, 4, &label);
-    ui::window window{L"edgelight", cursor, iconLg, iconSm, 800, 600, 0};
-    auto onDestroy = window.onDestroy.add([&] { ui::quit(); return true; });
     auto set = [&](POINT p) {
         b.setSize(p);
         hs1.setValue((p.x - 50) / 400.);
@@ -80,7 +78,34 @@ int ui::main() {
     auto onChangeW2 = hs2.onChange.add(setW);
     auto onChangeH1 = vs1.onChange.add(setH);
     auto onChangeH2 = vs2.onChange.add(setH);
-    window.setRoot(&grid);
+
+    ui::grid mainContentWithPadding{3, 4};
+    ui::spacer ltPad{{50, 50}};
+    ui::spacer rbPad{{50, 50}};
+    mainContentWithPadding.set(0, 0, &ltPad);
+    mainContentWithPadding.set(1, 1, &grid);
+    mainContentWithPadding.set(2, 2, &rbPad);
+    mainContentWithPadding.setRowStretch(1, 1);
+    mainContentWithPadding.setColStretch(1, 1);
+
+    ui::grid titlebar{4, 1};
+    ui::spacer titleLeftPad{{10, 1}};
+    ui::label title{{{L"DXUI test application", segoe, 16, 0xFFFFFFFFu, false}}};
+    ui::win_minimize titlebarMinimize{window};
+    ui::win_close titlebarClose{window};
+    titlebar.set(0, 0, &titleLeftPad);
+    titlebar.set(1, 0, &title, ui::grid::align_start);
+    titlebar.set(2, 0, &titlebarMinimize);
+    titlebar.set(3, 0, &titlebarClose);
+    titlebar.setColStretch(1, 1);
+
+    ui::grid mainContentWithTitlebar{1, 2};
+    mainContentWithTitlebar.set(0, 0, &titlebar);
+    mainContentWithTitlebar.set(0, 1, &mainContentWithPadding);
+    mainContentWithTitlebar.setRowStretch(1, 1);
+    mainContentWithTitlebar.setColStretch(0, 1);
+    window.setRoot(&mainContentWithTitlebar);
+
     window.setBackground(0x7f000000u);
     window.show();
     return ui::dispatch();

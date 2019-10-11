@@ -90,11 +90,13 @@
     <ClCompile Include="dxui/widget.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="dxui/window.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="dxui/widgets/button.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
+    <ClCompile Include="dxui/widgets/data.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="dxui/widgets/grid.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="dxui/widgets/label.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="dxui/widgets/slider.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="dxui/widgets/spacer.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="dxui/widgets/texrect.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
+    <ClCompile Include="dxui/widgets/wincontrol.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <FxCompile Include="dxui/shaders_px.hlsl">
       <EntryPointName>id_pixel</EntryPointName>
       <ShaderType>Pixel</ShaderType>

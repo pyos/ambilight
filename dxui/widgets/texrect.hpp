@@ -56,7 +56,12 @@ namespace ui {
     protected:
         virtual winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const = 0;
         virtual RECT getOuter() const = 0;
-        virtual RECT getInner() const = 0;
+        virtual RECT getInner() const {
+            // Default to sampling the color in the middle of the rectangle.
+            RECT r = getOuter();
+            POINT p = {(r.left + r.right) / 2, (r.top + r.bottom) / 2};
+            return {p.x, p.y, p.x, p.y};
+        }
 
     private:
         widget_handle contents;

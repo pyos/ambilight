@@ -6,7 +6,7 @@ winapi::com_ptr<ID3D11Texture2D> ui::button::getTexture(ui::dxcontext& ctx) cons
 }
 
 RECT ui::button::getOuter() const {
-    switch (currentState) {
+    switch (getState()) {
         default:     return builtinRect(BUTTON_OUTER);
         case hover:  return builtinRect(BUTTON_OUTER_HOVER);
         case active: return builtinRect(BUTTON_OUTER_ACTIVE);
@@ -14,7 +14,7 @@ RECT ui::button::getOuter() const {
 }
 
 RECT ui::button::getInner() const {
-    switch (currentState) {
+    switch (getState()) {
         default:     return builtinRect(BUTTON_INNER);
         case hover:  return builtinRect(BUTTON_INNER_HOVER);
         case active: return builtinRect(BUTTON_INNER_ACTIVE);
