@@ -87,6 +87,7 @@ int ui::main() {
     ui::grid titlebar{5, 1};
     ui::spacer titleLeftPad{{10, 1}};
     ui::label title{{{L"DXUI test application", segoe, 16, 0xFFFFFFFFu, false}}};
+    title.setHideOverflow(true);
     ui::win_minimize titlebarMinimize{window};
     ui::win_maximize titlebarMaximize{window};
     ui::win_close titlebarClose{window};

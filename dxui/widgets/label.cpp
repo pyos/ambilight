@@ -29,6 +29,10 @@ const ui::font_symbol& ui::font::operator[](wchar_t point) const {
 }
 
 POINT ui::label::measureMinEx() const {
+    return measureEx({0, 0});
+}
+
+POINT ui::label::measureEx(POINT fit) const {
     double tx = 0, ty = 0;
     double sx = 0, ex = 0;
     split<const ui::text_part>(data, [](auto& c) { return c.breakAfter; }, 0, [&](size_t, util::span<const ui::text_part> parts) {
@@ -52,7 +56,7 @@ POINT ui::label::measureMinEx() const {
         tx = std::max(lx + ex, tx), ty += ly;
     });
     originX = sx;
-    return {(LONG)(sx + tx) + 1, (LONG)ty + 1};
+    return {hideOverflow ? std::min((LONG)(sx + tx) + 1, fit.x) : (LONG)(sx + tx) + 1, (LONG)ty + 1};
 }
 
 void ui::label::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {

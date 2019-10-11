@@ -56,11 +56,21 @@ namespace ui {
     struct label : widget {
         label(std::vector<text_part> data)
             : data(std::move(data))
+            , hideOverflow(false)
             , lineHeight(1.3)
         {}
 
         void setText(std::vector<text_part> updated) {
             data = std::move(updated);
+            invalidateSize();
+        }
+
+        // Allow sizing this label smaller than the space required to display all lines
+        // without cutting them off. (In that case, some of the text will be invisible.)
+        //
+        // TODO insert an ellipsis instead
+        void setHideOverflow(bool value) {
+            hideOverflow = value;
             invalidateSize();
         }
 
@@ -71,11 +81,12 @@ namespace ui {
 
     private:
         POINT measureMinEx() const override;
-        POINT measureEx(POINT) const override { return measureMin(); }
+        POINT measureEx(POINT) const override;
         void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
 
     private:
         std::vector<text_part> data;
+        bool hideOverflow;
         double lineHeight;
         mutable double originX;
     };
