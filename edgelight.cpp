@@ -20,28 +20,35 @@ int ui::main() {
     hs2.setOrientation(ui::slider::deg180);
     vs2.setOrientation(ui::slider::deg270);
     ui::font segoe{IDI_FONT_SEGOE_UI};
-    ui::label label0{segoe, 16, L"The quick brown fox jumps over the lazy dog."};
-    ui::label label1{segoe, 20, L"The quick brown fox jumps over the lazy dog."};
-    ui::label label2{segoe, 30, L"The quick brown fox jumps over the lazy dog."};
-    ui::label label3{segoe, 40, L"The quick brown fox jumps over the lazy dog."};
-    label0.setFontColor(0xFFFFFFFFu);
-    label1.setFontColor(0xFFFFAAAAu);
-    label2.setFontColor(0xFFAAFFAAu);
-    label3.setFontColor(0xFFAAAAFFu);
-    ui::grid grid{3, 7};
-    grid.set(0, 0, &a);
-    grid.set(1, 1, &c);
-    grid.set(2, 2, &d);
-    grid.set(1, 0, &hs1);
-    grid.set(2, 1, &vs1);
-    grid.set(1, 2, &hs2);
-    grid.set(0, 1, &vs2);
-    grid.setColStretch(1, 1);
-    grid.setRowStretch(1, 1);
-    grid.set(1, 3, &label0);
-    grid.set(1, 4, &label1);
-    grid.set(1, 5, &label2);
-    grid.set(1, 6, &label3);
+    ui::font segoe_bold{IDI_FONT_SEGOE_UI_BOLD};
+    ui::font cambria{IDI_FONT_CAMBRIA};
+    ui::label heading{{{L"This is a heading.", cambria, 60, 0xFFFFFFFFu, false}}};
+    ui::label label{{
+        {L"The quick ",    segoe,      12, 0xFFFFFFFFu, false},
+        {L"brown fox ",    segoe_bold, 12, 0xFFFFAAAAu, false},
+        {L"jumps over ",   segoe,      12, 0xFFFFFFFFu, false},
+        {L"the lazy dog.", segoe_bold, 12, 0xFFAAAAFFu, true},
+        {L"The quick ",    segoe,      18, 0xFFFFFFFFu, false},
+        {L"brown fox ",    segoe_bold, 18, 0xFFFFAAAAu, false},
+        {L"jumps over ",   segoe,      18, 0xFFFFFFFFu, false},
+        {L"the lazy dog.", segoe_bold, 18, 0xFFAAAAFFu, true},
+        {L"The quick ",    segoe,      32, 0xFFFFFFFFu, false},
+        {L"brown fox ",    segoe_bold, 32, 0xFFFFAAAAu, false},
+        {L"jumps over ",   segoe,      32, 0xFFFFFFFFu, false},
+        {L"the lazy dog.", segoe_bold, 32, 0xFFAAAAFFu, true},
+    }};
+    ui::grid grid{3, 5};
+    grid.set(1, 0, &heading, ui::grid::align_start);
+    grid.set(0, 1, &a);
+    grid.set(1, 2, &c);
+    grid.set(2, 3, &d);
+    grid.set(1, 1, &hs1);
+    grid.set(2, 2, &vs1);
+    grid.set(1, 3, &hs2);
+    grid.set(0, 2, &vs2);
+    grid.setColStretch(2, 1);
+    grid.setRowStretch(2, 1);
+    grid.set(1, 4, &label);
     auto window = ui::window(L"edgelight", cursor, iconLg, iconSm, 800, 600, 0);
     auto onDestroy = window.onDestroy.add([&] { ui::quit(); return true; });
     auto set = [&](POINT p) {

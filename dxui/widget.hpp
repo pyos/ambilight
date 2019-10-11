@@ -439,7 +439,7 @@ namespace ui {
                    ui::fromBundled(resourceId + 1))
         {}
 
-        winapi::com_ptr<ID3D11Texture2D> loadTexture(ui::dxcontext& ctx) {
+        winapi::com_ptr<ID3D11Texture2D> loadTexture(ui::dxcontext& ctx) const {
             return ctx.textureFromPNG(texture);
         }
 
@@ -458,32 +458,24 @@ namespace ui {
         mutable int nativeSize_ = -1;
     };
 
+    struct text_part {
+        util::span<const wchar_t> data;
+        const font& font;
+        uint32_t fontSize  = 18;
+        uint32_t fontColor = 0xFFFFFFFFu;
+        bool breakAfter = false;
+        // TODO line alignment
+    };
+
     struct label : widget {
-        label(ui::font& font, uint32_t fontSize, util::span<const wchar_t> contents = {})
-            : text(std::move(contents))
-            , font(&font)
-            , fontSize(fontSize)
-            , lineHeight(1.2)
+        label(std::vector<text_part> data)
+            : data(std::move(data))
+            , lineHeight(1.3)
         {}
 
-        void setText(util::span<wchar_t> updated) {
-            text = updated;
+        void setText(std::vector<text_part> updated) {
+            data = std::move(updated);
             invalidateSize();
-        }
-
-        void setFont(ui::font& f) {
-            font = &f;
-            invalidateSize();
-        }
-
-        void setFontSize(uint32_t sz) {
-            fontSize = sz;
-            invalidateSize();
-        }
-
-        void setFontColor(uint32_t color) {
-            fontColor = color;
-            invalidate();
         }
 
         void setLineHeight(double lh) {
@@ -497,12 +489,8 @@ namespace ui {
         void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
 
     private:
-        util::span<const wchar_t> text;
-        ui::font* font;
-        uint32_t fontSize;
-        uint32_t fontColor = 0xFF000000;
+        std::vector<text_part> data;
         double lineHeight;
-        mutable POINT origin;
-        // TODO line alignment
+        mutable double originX;
     };
 }

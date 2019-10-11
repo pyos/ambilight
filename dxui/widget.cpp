@@ -120,29 +120,28 @@ static util::span<T> strip(util::span<T> in, F&& discard) {
     return util::span<T>(a, b - a);
 }
 
-template <typename T, typename F /* = void(size_t, util::span<T>) */>
-static void splitString(util::span<T> string, T sep, size_t limit, F&& f) {
-    auto it = string.begin();
-    for (size_t i = 0;; i++) {
-        auto next = i + 1 == limit ? string.end() : std::find(it, string.end(), sep);
-        f(i, util::span<T>(it, next - it));
-        if (next == string.end())
-            break;
-        it = next + 1;
+template <typename T, typename S /* = bool(T&) */, typename F /* = void(size_t, util::span<T>) */>
+static void split(util::span<T> string, S&& sep, size_t limit, F&& f) {
+    size_t i = 0;
+    for (auto it = string.begin(), next = it; it != string.end(); it = next) {
+        next = i + 1 == limit ? string.end() : std::find_if(it, string.end(), sep);
+        if (next != string.end())
+            next++;
+        f(i++, util::span<T>(it, next - it));
     }
 }
 
 template <size_t columns, typename F /* = void(size_t, util::span<const char>[columns]) */>
 static void readPseudoCSV(util::span<const char> resource, F&& f) {
     size_t skipped = 0;
-    splitString<const char>(resource, '\n', 0, [&](size_t lineno, util::span<const char> line) {
+    split<const char>(resource, [](char c) { return c == '\n'; }, 0, [&](size_t lineno, util::span<const char> line) {
         // Ignore empty lines and comments (starting with whitespace and then `#`).
         if (std::all_of(line.begin(), line.end(), [](char c) { return isspace(c); }) || line[0] == '#') {
             skipped++;
             return;
         }
         util::span<const char> stripped[columns] = {};
-        splitString<const char>(line, ',', columns, [&](size_t i, util::span<const char> part) {
+        split<const char>(line, [](char c) { return c == ','; }, columns, [&](size_t i, util::span<const char> part) {
             stripped[i] = strip(part, [](char c) { return isspace(c); });
         });
         f(lineno - skipped, stripped);
@@ -301,56 +300,62 @@ const ui::font_symbol& ui::font::operator[](wchar_t point) const {
 }
 
 POINT ui::label::measureMinEx() const {
-    POINT ret = {0, 0};
-    long x = 0;
-    long y = 0;
-    long originX = 0;
-    splitString<const wchar_t>(text, L'\n', 0, [&](size_t, util::span<const wchar_t> line) {
-        long w = 0;
-        if (line) {
-            // Align the text so that there is a straight vertical line going through
-            // each text line's first character's origin.
-            originX = std::max<long>(originX, (*font)[line[0]].originX);
-            for (wchar_t c : line) w += (*font)[c].advance;
-            // Reserve some space on the right for the last character's horizontal overflow.
-            auto& b = (*font)[line[line.size() - 1]];
-            w += b.w - b.advance - b.originX;
+    double tx = 0, ty = 0;
+    double sx = 0, ex = 0;
+    split<const ui::text_part>(data, [](auto& c) { return c.breakAfter; }, 0, [&](size_t, util::span<const ui::text_part> parts) {
+        bool firstInLine = true;
+        double lx = 0, ly = 0;
+        for (const ui::text_part& part : parts) {
+            if (part.data) {
+                double scale = (double)part.fontSize / part.font.nativeSize();
+                for (wchar_t c : part.data)
+                    lx += part.font[c].advance * scale;
+                auto& last = part.font[part.data[part.data.size() - 1]];
+                // Horizontally align lines so that there is a straight vertical line
+                // going through the origins of the first character of each.
+                sx = std::max(sx, scale * part.font[part.data[0]].originX * firstInLine);
+                // Reserve some space for the last character's right edge.
+                ex = scale * (last.w - last.advance - last.originX);
+                firstInLine = false;
+            }
+            ly = std::max(ly, part.fontSize * lineHeight);
         }
-        x  = std::max(x, w);
-        y += font->nativeSize() * lineHeight;
+        tx = std::max(lx + ex, tx), ty += ly;
     });
-    origin = {originX, (LONG)(font->nativeSize() * lineHeight / 4)};
-    double scale = (double)fontSize / font->nativeSize();
-    return {(LONG)((x + originX) * scale + 0.5), (LONG)(y * scale + 0.5)};
+    originX = sx;
+    return {(LONG)(sx + tx) + 1, (LONG)ty + 1};
 }
 
 void ui::label::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
-    measureMin(); // Make sure the baseline is set to the correct value.
+    measureMin(); // Make sure the origin X and the character count are set to the correct values.
     std::vector<ui::vertex> quads;
-    quads.reserve(text.size() * 6);
+    if (!data.empty())
+        quads.reserve(std::max_element(data.begin(), data.end(), [](auto& a, auto& b) {
+            return a.data.size() < b.data.size(); })->data.size());
     // TODO use DirectWrite or something.
-    double scale = (double)fontSize / font->nativeSize();
-    long y = -origin.y;
-    splitString<const wchar_t>(text, L'\n', 0, [&](size_t, util::span<const wchar_t> line) {
-        y += font->nativeSize() * lineHeight;
-        if (auto cs = strip(line, [](wchar_t c) { return c >= 256; })) {
-            long x = origin.x;
-            for (wchar_t c : cs) {
-                auto& info = (*font)[c];
-                RECT s = {info.x, info.y, info.x + info.w, info.y + info.h};
-                double tl = (x - info.originX) * scale + total.left
-                     , tt = (y - info.originY) * scale + total.top
-                     , tr = (x - info.originX + info.w) * scale + total.left
-                     , tb = (y - info.originY + info.h) * scale + total.top;
-                ui::vertex quad[] = {QUADP(tl, tt, tr, tb, 0, s.left, s.top, s.right, s.bottom)};
+    double y = 0;
+    split<const ui::text_part>(data, [](auto& c) { return c.breakAfter; }, 0, [&](size_t, util::span<const ui::text_part> parts) {
+        double x = originX;
+        double ly = std::max_element(parts.begin(), parts.end(), [](auto& a, auto& b) {
+            return a.fontSize < b.fontSize; })->fontSize * lineHeight;
+        y += ly * 0.75;
+        for (const ui::text_part& part : parts) {
+            quads.clear();
+            double scale = (double)part.fontSize / part.font.nativeSize();
+            for (wchar_t c : part.data) {
+                auto& info = part.font[c];
+                double tl = x - (info.originX) * scale + total.left
+                     , tt = y - (info.originY) * scale + total.top
+                     , tr = x - (info.originX - info.w) * scale + total.left
+                     , tb = y - (info.originY - info.h) * scale + total.top;
+                ui::vertex quad[] = {QUADP(tl, tt, tr, tb, 0, info.x, info.y, info.x + info.w, info.y + info.h)};
                 quads.insert(quads.end(), std::begin(quad), std::end(quad));
-                x += info.advance;
+                x += scale * info.advance;
             }
+            for (auto& vertex : quads)
+                vertex.clr = ARGB2CLR(part.fontColor);
+            ctx.draw(target, part.font.loadTexture(ctx), quads, dirty, true);
         }
+        y += ly * 0.25;
     });
-    // TODO textured color
-    // TODO multiple fonts, colors, and sizes within a single text
-    for (auto& vertex : quads)
-        vertex.clr = ARGB2CLR(fontColor);
-    ctx.draw(target, font->loadTexture(ctx), quads, dirty, true);
 }
