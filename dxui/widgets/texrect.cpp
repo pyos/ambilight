@@ -4,7 +4,9 @@ void ui::texrect::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total
     auto [ol, ot, or, ob] = getOuter();
     auto [il, it, ir, ib] = getInner();
     auto pl = il - ol, pt = it - ot, pr = or - ir, pb = ob - ib;
-    auto [cw, ch] = contents->measure({total.right - total.left - pl - pr, total.bottom - total.top - pt - pb});
+    auto [cw, ch] = contents
+        ? contents->measure({total.right - total.left - pl - pr, total.bottom - total.top - pt - pb})
+        : POINT{0, 0};
     POINT p0 = {total.left, total.top};  //  0--+--+--+
     POINT p1 = {p0.x + pl, p0.y + pt};   //  +--1--+--+
     POINT p2 = {p1.x + cw, p1.y + ch};   //  +--+--2--+
@@ -21,5 +23,6 @@ void ui::texrect::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total
         QUADP(p2.x, p2.y, p3.x, p3.y, 0, ir, ib, or, ob), // bottom-right
     };
     ctx.draw(target, getTexture(ctx), vs, dirty);
-    contents->draw(ctx, target, {p1.x, p1.y, p2.x, p2.y}, rectIntersection(dirty, {p1.x, p1.y, p2.x, p2.y}));
+    if (contents)
+        contents->draw(ctx, target, {p1.x, p1.y, p2.x, p2.y}, rectIntersection(dirty, {p1.x, p1.y, p2.x, p2.y}));
 }

@@ -52,7 +52,7 @@ int ui::main() {
     grid.setColStretch(2, 1);
     grid.setRowStretch(2, 1);
     grid.set(1, 4, &label);
-    auto window = ui::window(L"edgelight", cursor, iconLg, iconSm, 800, 600, 0);
+    ui::window window{L"edgelight", cursor, iconLg, iconSm, 800, 600, 0};
     auto onDestroy = window.onDestroy.add([&] { ui::quit(); return true; });
     auto set = [&](POINT p) {
         b.setSize(p);

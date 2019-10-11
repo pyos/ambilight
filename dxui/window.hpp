@@ -87,6 +87,7 @@ namespace ui {
     private:
         static void unregister_class(const wchar_t*);
 
+        void onChildRelease(widget& w) override { setRoot(nullptr); }
         void onChildRedraw(widget&, RECT area) override { draw(area); }
         void onChildResize(widget&) override { draw(); }
         void onMouseCapture(widget& target) override {

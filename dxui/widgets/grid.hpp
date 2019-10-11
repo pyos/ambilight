@@ -41,6 +41,12 @@ namespace ui {
             invalidateSize();
         }
 
+        void onChildRelease(widget& w) override {
+            // assert(w is in cells);
+            std::find_if(cells.begin(), cells.end(), [&](auto& p) { return p.get() == &w; })->reset();
+            invalidateSize();
+        }
+
     private:
         // TODO don't invalidate size if a stretchable widget is resized within the allocated bounds
         struct group {

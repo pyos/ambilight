@@ -9,13 +9,23 @@
 namespace ui {
     struct widget;
     struct widget_parent {
+        virtual void onChildRelease(widget&) = 0;
         virtual void onChildRedraw(widget&, RECT) = 0;
         virtual void onChildResize(widget&) = 0;
         virtual void onMouseCapture(widget&) = 0;
     };
 
     struct widget : widget_parent {
-        virtual ~widget() = default;
+        widget() = default;
+        // Since there are pointers everywhere, copying and moving is forbidden.
+        // Use `unique_ptr` and `shared_ptr` if you have to.
+        widget(const widget&) = delete;
+        widget& operator=(const widget&) = delete;
+
+        virtual ~widget() {
+            if (parent) parent->onChildRelease(*this);
+            // assert(!parent);
+        }
 
         // Return the minimum size for this widget. Any size passed to `measure`
         // will be made at least as big as the returned value. If a rectangle
@@ -55,6 +65,10 @@ namespace ui {
 
         void setParent(widget_parent* p) {
             parent = p;
+        }
+
+        void onChildRelease(widget& w) override {
+            throw std::runtime_error("parent ignored child widget release request; use-after-free imminent");
         }
 
         void onChildRedraw(widget&, RECT area) override {

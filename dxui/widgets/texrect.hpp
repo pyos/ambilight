@@ -21,9 +21,16 @@ namespace ui {
     // TODO forward mouse events within the child widget's rectangle.
     //
     struct texrect : widget {
+        texrect() = default;
         texrect(widget& child)
             : contents(&child, *this)
         {}
+
+        void onChildRelease(widget& w) override {
+            // assert(contents.get() == &w);
+            contents.reset();
+            invalidateSize();
+        }
 
     private:
         RECT getPadding() const {
@@ -34,13 +41,13 @@ namespace ui {
 
         POINT measureMinEx() const {
             auto [pl, pt, pr, pb] = getPadding();
-            auto [w, h] = contents->measureMin();
+            auto [w, h] = contents ? contents->measureMin() : POINT{0, 0};
             return {w + pl + pr, h + pt + pb};
         }
 
         POINT measureEx(POINT fit) const {
             auto [pl, pt, pr, pb] = getPadding();
-            auto [w, h] = contents->measure({fit.x - pl - pr, fit.y - pt - pb});
+            auto [w, h] = contents ? contents->measure({fit.x - pl - pr, fit.y - pt - pb}) : POINT{0, 0};
             return {w + pl + pr, h + pt + pb};
         }
 
