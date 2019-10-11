@@ -75,6 +75,7 @@ namespace ui {
         void drawImmediate(RECT);
 
         void onMouse(POINT abs, int keys);
+        void onMouseLeave();
 
     public:
         // Fired when the window becomes visible because of a call to `show()` or because
@@ -118,6 +119,7 @@ namespace ui {
         UINT w = 1, h = 1;
         RECT lastPainted = {0, 0, 0, 0};
         uint32_t background = 0xFFFFFFFFu;
+        bool mouseInBounds = false;
         bool dragByEmptyAreas = true;
         POINT dragBy = {-1, -1};
     };

@@ -135,8 +135,9 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
         case WM_XBUTTONDOWN:
             window->onMouse(POINT{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)}, wParam);
             break;
-        // case WM_MOUSELEAVE:
-        //     TODO this requires TrackMouseEvent
+        case WM_MOUSELEAVE:
+            window->onMouseLeave();
+            break;
         case WM_PAINT: {
             RECT scheduled;
             if (GetUpdateRect(handle, &scheduled, FALSE))
@@ -243,6 +244,14 @@ void ui::window::setBackground(uint32_t tint) {
 }
 
 void ui::window::onMouse(POINT abs, int keys) {
+    if (!mouseInBounds) {
+        mouseInBounds = true;
+        TRACKMOUSEEVENT tme = {};
+        tme.cbSize = sizeof(tme);
+        tme.dwFlags = TME_LEAVE;
+        tme.hwndTrack = *this;
+        winapi::throwOnFalse(TrackMouseEvent(&tme));
+    }
     if (mouseCapture) {
         if (!mouseCapture->onMouse(abs, keys)) {
             mouseCapture = nullptr;
@@ -266,4 +275,10 @@ void ui::window::onMouse(POINT abs, int keys) {
             SetCapture(*this);
         }
     }
+}
+
+void ui::window::onMouseLeave() {
+    mouseInBounds = false;
+    if (root)
+        root->onMouseLeave();
 }
