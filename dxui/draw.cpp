@@ -130,7 +130,7 @@ void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util:
     context->Draw(vertices.size(), 0);
 }
 
-winapi::com_ptr<ID3D11Texture2D> ui::dxcontext::textureFromPNG(util::span<const uint8_t> in) {
+winapi::com_ptr<ID3D11Texture2D> ui::dxcontext::textureFromPNG(util::span<const uint8_t> in, bool mipmaps) {
     winapi::com_ptr<IStream> stream;
     *&stream = SHCreateMemStream(in.data(), in.size());
     auto dec = COMv(IWICBitmapDecoder, CoCreateInstance, CLSID_WICPngDecoder, nullptr, CLSCTX_INPROC_SERVER);
@@ -156,6 +156,8 @@ winapi::com_ptr<ID3D11Texture2D> ui::dxcontext::textureFromPNG(util::span<const 
     initData.pSysMem = tmp.data();
     initData.SysMemPitch = width * 4;
     auto initial = COMe(ID3D11Texture2D, device->CreateTexture2D, &desc, &initData);
+    if (!mipmaps)
+        return initial;
     desc.MipLevels = 0;
     desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
     desc.MiscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;

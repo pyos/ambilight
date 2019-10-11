@@ -341,15 +341,15 @@ void ui::label::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, 
                      , tt = (y - table[c].originY) * scale + total.top
                      , tr = (x - table[c].originX + table[c].w) * scale + total.left
                      , tb = (y - table[c].originY + table[c].h) * scale + total.top;
-                // Cancel out `QUADP`'s half-pixel compensation -- smoothness is what we want here.
-                ui::vertex quad[] = {QUADP(tl, tt, tr, tb, 0, s.left-.5, s.top-.5, s.right+.5, s.bottom+.5)};
+                ui::vertex quad[] = {QUADP(tl, tt, tr, tb, 0, s.left, s.top, s.right, s.bottom)};
                 quads.insert(quads.end(), std::begin(quad), std::end(quad));
                 x += table[c].advance;
             }
         }
     });
+    // TODO textured color
+    // TODO multiple fonts, colors, and sizes within a single text
     for (auto& vertex : quads)
         vertex.clr = ARGB2CLR(fontColor);
-    // TODO pass color/texture to pixel shader
     ctx.draw(target, font->loadTexture(ctx), quads, dirty, true);
 }

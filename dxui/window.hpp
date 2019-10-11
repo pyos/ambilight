@@ -17,16 +17,21 @@ namespace ui {
     //     auto window = ui::window{L"unique class name", cursor, igonLg, iconSm, 800, 600, WS_OVERLAPPEDWINDOW};
     //     window.draw(someWidget);
     //
+    // NOTE: the window is initially hidden.
+    //
     struct window : private widget_parent {
         window(const wchar_t* name, cursor& cursor, icon& iconLg, icon& iconSm, int w, int h, int style);
 
         // Cast this window to a raw WinAPI handle.
         operator HWND() const { return handle.get(); }
 
-        // Show this window. NOTE: the window is initially hidden.
-        void show() { ShowWindow(*this, SW_SHOWNORMAL); }
+        // Show this window.
+        void show() {
+            drawImmediate({0, 0, (LONG)w, (LONG)h});
+            ShowWindow(*this, SW_SHOWNORMAL);
+        }
 
-        // Hide (not minimize!) this window.
+        // Hide (not minimize) this window.
         void hide() { ShowWindow(*this, SW_HIDE); }
 
         // Whether the window is visible, i.e. not hidden or minimized.
@@ -51,13 +56,13 @@ namespace ui {
         }
 
         // Schedule redrawing of the entire window.
-        void draw() { lastPainted = {0, 0, 0, 0}; draw({0, 0, (LONG)w, (LONG)h}); }
+        void draw() { draw({0, 0, (LONG)w, (LONG)h}); }
 
         // Schedule redrawing of a region.
-        void draw(RECT dirty);
+        void draw(RECT);
 
-        // Redraw the scheduled areas now.
-        void drawScheduled();
+        // Redraw the specified area right now.
+        void drawImmediate(RECT);
 
         void onMouse(POINT abs, int keys);
 

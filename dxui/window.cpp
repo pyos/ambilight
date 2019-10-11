@@ -132,9 +132,12 @@ static LRESULT windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
         // case WM_MOUSELEAVE:
         //     TODO this requires TrackMouseEvent
-        case WM_PAINT:
-            window->drawScheduled();
+        case WM_PAINT: {
+            RECT scheduled;
+            if (GetUpdateRect(handle, &scheduled, FALSE))
+                window->drawImmediate(scheduled);
             break;
+        }
     }
     return DefWindowProc(handle, msg, wParam, lParam);
 }
@@ -158,7 +161,7 @@ ui::window::window(const wchar_t* name, cursor& cursor, icon& iconLg, icon& icon
         r.right - r.left, r.bottom - r.top, nullptr, nullptr, impl::hInstance, nullptr));
     winapi::throwOnFalse(handle);
     SetWindowLongPtr(*this, GWLP_USERDATA, (LONG_PTR)this);
-    //SetWindowLongPtr(*this, GWL_STYLE, WS_BORDER);
+    SetWindowLongPtr(*this, GWL_STYLE, style);
 
     auto dxgiDevice = COMi(IDXGIDevice, context.raw()->QueryInterface);
     auto dxgiAdapter = COMi(IDXGIAdapter, dxgiDevice->GetParent);
@@ -187,7 +190,7 @@ void ui::window::draw(RECT dirty) {
     InvalidateRect(*this, &dirty, FALSE);
 }
 
-void ui::window::drawScheduled() {
+void ui::window::drawImmediate(RECT scheduled) {
     RECT rect, total;
     GetClientRect(*this, &rect);
     GetWindowRect(*this, &total);
@@ -211,17 +214,16 @@ void ui::window::drawScheduled() {
         DXGI_SWAP_CHAIN_DESC swapChainDesc;
         swapChain->GetDesc(&swapChainDesc);
         winapi::throwOnFalse(swapChain->ResizeBuffers(swapChainDesc.BufferCount, w, h, swapChainDesc.BufferDesc.Format, swapChainDesc.Flags));
-        draw();
+        scheduled = {0, 0, (LONG)w, (LONG)h};
     }
 
-    RECT scheduled;
-    if (!GetUpdateRect(*this, &scheduled, FALSE))
-        return;
     auto target = COMv(ID3D11Texture2D, swapChain->GetBuffer, 0);
     // We're in flip mode, so the current back buffer contains outdated state.
-    // TODO don't draw the intersection twice
-    context.clear(target, lastPainted, background);
-    if (root) root->draw(context, target, {0, 0, (LONG)w, (LONG)h}, lastPainted);
+    // TODO don't draw the intersection twice at all
+    if (!isSubRect(lastPainted, scheduled)) {
+        context.clear(target, lastPainted, background);
+        if (root) root->draw(context, target, {0, 0, (LONG)w, (LONG)h}, lastPainted);
+    }
     context.clear(target, scheduled, background);
     if (root) root->draw(context, target, {0, 0, (LONG)w, (LONG)h}, scheduled);
     lastPainted = scheduled;
@@ -244,7 +246,6 @@ void ui::window::setBackground(uint32_t tint) {
     ca.pvData = &ap;
     ca.cbData = sizeof(ap);
     winapi::throwOnFalse(SetWindowCompositionAttribute(*this, &ca));
-    //SetWindowLongPtr(*this, GWL_STYLE, WS_BORDER);
 }
 
 void ui::window::onMouse(POINT abs, int keys) {

@@ -20,13 +20,15 @@ int ui::main() {
     hs2.setOrientation(ui::slider::deg180);
     vs2.setOrientation(ui::slider::deg270);
     ui::font segoe{IDI_FONT_SEGOE_UI};
+    ui::label label0{segoe, 16, L"The quick brown fox jumps over the lazy dog."};
     ui::label label1{segoe, 20, L"The quick brown fox jumps over the lazy dog."};
     ui::label label2{segoe, 30, L"The quick brown fox jumps over the lazy dog."};
     ui::label label3{segoe, 40, L"The quick brown fox jumps over the lazy dog."};
+    label0.setFontColor(0xFFFFFFFFu);
     label1.setFontColor(0xFFFFAAAAu);
     label2.setFontColor(0xFFAAFFAAu);
     label3.setFontColor(0xFFAAAAFFu);
-    ui::grid grid{3, 6};
+    ui::grid grid{3, 7};
     grid.set(0, 0, &a);
     grid.set(1, 1, &c);
     grid.set(2, 2, &d);
@@ -36,10 +38,11 @@ int ui::main() {
     grid.set(0, 1, &vs2);
     grid.setColStretch(1, 1);
     grid.setRowStretch(1, 1);
-    grid.set(1, 3, &label1);
-    grid.set(1, 4, &label2);
-    grid.set(1, 5, &label3);
-    auto window = ui::window(L"edgelight", cursor, iconLg, iconSm, 800, 600, WS_OVERLAPPEDWINDOW);
+    grid.set(1, 3, &label0);
+    grid.set(1, 4, &label1);
+    grid.set(1, 5, &label2);
+    grid.set(1, 6, &label3);
+    auto window = ui::window(L"edgelight", cursor, iconLg, iconSm, 800, 600, 0);
     auto onDestroy = window.onDestroy.add([&] { ui::quit(); return true; });
     auto set = [&](POINT p) {
         b.setSize(p);

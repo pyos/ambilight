@@ -12,10 +12,18 @@ float4 id_pixel(PS_INPUT input) : SV_Target {
     return input.Clr * (1 - input.Blw) + tx.Sample(samLinear, input.Tex) * input.Blw;
 }
 
+float contour(float d, float w) {
+    return clamp((d - .5) / w + .5, 0., 1.);
+}
+
 float4 distance_color(PS_INPUT input) : SV_Target {
-    float x = tx.Sample(samLinear, input.Tex).y;
-    float s = 1 / fwidth(x);
-    float d = (x - 0.5) * s;
-    float4 color = {input.Clr.x, input.Clr.y, input.Clr.z, input.Clr.a * clamp(d + 0.5, 0.0, 1.0)};
-    return color;
+    float d = tx.Sample(samLinear, input.Tex).r;
+    float w = fwidth(d);
+    float2 duv = 0.333 * (ddx(input.Tex) + ddy(input.Tex));
+    float4 box = {input.Tex - duv, input.Tex + duv};
+    float b = contour(tx.Sample(samLinear, box.xy).r, w)
+            + contour(tx.Sample(samLinear, box.zw).r, w)
+            + contour(tx.Sample(samLinear, box.xw).r, w)
+            + contour(tx.Sample(samLinear, box.zy).r, w);
+    return float4(input.Clr.rgb, input.Clr.a * (contour(d, w) / 3 + b / 6));
 }
