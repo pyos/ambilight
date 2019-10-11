@@ -40,13 +40,13 @@ POINT ui::label::measureEx(POINT fit) const {
         double lx = 0, ly = 0;
         for (const ui::text_part& part : parts) {
             if (part.data) {
-                double scale = (double)part.fontSize / part.font.nativeSize();
+                double scale = (double)part.fontSize / part.font.get().nativeSize();
                 for (wchar_t c : part.data)
-                    lx += part.font[c].advance * scale;
-                auto& last = part.font[part.data[part.data.size() - 1]];
+                    lx += part.font.get()[c].advance * scale;
+                auto& last = part.font.get()[part.data[part.data.size() - 1]];
                 // Horizontally align lines so that there is a straight vertical line
                 // going through the origins of the first character of each.
-                sx = std::max(sx, scale * part.font[part.data[0]].originX * firstInLine);
+                sx = std::max(sx, scale * part.font.get()[part.data[0]].originX * firstInLine);
                 // Reserve some space for the last character's right edge.
                 ex = scale * (last.w - last.advance - last.originX);
                 firstInLine = false;
@@ -74,9 +74,9 @@ void ui::label::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, 
         y += ly * 0.75;
         for (const ui::text_part& part : parts) {
             quads.clear();
-            double scale = (double)part.fontSize / part.font.nativeSize();
+            double scale = (double)part.fontSize / part.font.get().nativeSize();
             for (wchar_t c : part.data) {
-                auto& info = part.font[c];
+                auto& info = part.font.get()[c];
                 double tl = x - (info.originX) * scale + total.left
                      , tt = y - (info.originY) * scale + total.top
                      , tr = x - (info.originX - info.w) * scale + total.left
@@ -87,7 +87,7 @@ void ui::label::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, 
             }
             for (auto& vertex : quads)
                 vertex.clr = ARGB2CLR(part.fontColor);
-            ctx.draw(target, part.font.loadTexture(ctx), quads, dirty, true);
+            ctx.draw(target, part.font.get().loadTexture(ctx), quads, dirty, true);
         }
         y += ly * 0.25;
     });

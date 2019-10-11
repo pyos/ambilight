@@ -52,7 +52,7 @@ namespace ui {
 
     struct text_part {
         util::span<const wchar_t> data;
-        const font& font;
+        std::reference_wrapper<const font> font;
         uint32_t fontSize  = 18;
         uint32_t fontColor = 0xFFFFFFFFu;
         bool breakAfter = false;
@@ -66,7 +66,18 @@ namespace ui {
             , lineHeight(1.3)
         {}
 
-        void setText(std::vector<text_part> updated) {
+        template <typename Container>
+        void setText(Container&& updated) {
+            data.assign(std::begin(updated), std::end(updated));
+            invalidateSize();
+        }
+
+        void setText(std::initializer_list<text_part> updated) {
+            data.assign(std::begin(updated), std::end(updated));
+            invalidateSize();
+        }
+
+        void setText(std::vector<text_part>&& updated) {
             data = std::move(updated);
             invalidateSize();
         }
