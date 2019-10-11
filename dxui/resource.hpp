@@ -2,6 +2,7 @@
 
 #include "base.hpp"
 #include "span.hpp"
+#include "../resource.h"
 
 namespace ui {
     using resource = std::pair<HINSTANCE, const wchar_t*>;

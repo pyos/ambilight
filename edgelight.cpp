@@ -1,8 +1,11 @@
 #include "dxui/base.hpp"
 #include "dxui/resource.hpp"
 #include "dxui/window.hpp"
-
-#include "resource.h"
+#include "dxui/widgets/button.hpp"
+#include "dxui/widgets/grid.hpp"
+#include "dxui/widgets/label.hpp"
+#include "dxui/widgets/slider.hpp"
+#include "dxui/widgets/spacer.hpp"
 
 int ui::main() {
     auto asd = ui::read(ui::fromBundled(IDI_WIDGETS), L"PNG");
