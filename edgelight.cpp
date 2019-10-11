@@ -92,7 +92,7 @@ int ui::main() {
     ui::win_maximize titlebarMaximize{window};
     ui::win_close titlebarClose{window};
     titlebar.set(0, 0, &titleLeftPad);
-    titlebar.set(1, 0, &title, ui::grid::align_start);
+    titlebar.set(1, 0, &title, ui::grid::align_global_center);
     titlebar.set(2, 0, &titlebarMinimize);
     titlebar.set(3, 0, &titlebarMaximize);
     titlebar.set(4, 0, &titlebarClose);

@@ -1,18 +1,20 @@
 #include "grid.hpp"
 
-static LONG alignAs(LONG outer, LONG inner, ui::grid::alignment a) {
+static LONG alignAs(LONG outer, LONG inner, LONG globalCenter, ui::grid::alignment a) {
     switch (a) {
         default:
-        case ui::grid::align_start:  return 0;
-        case ui::grid::align_center: return (outer - inner) / 2;
-        case ui::grid::align_end:    return (outer - inner);
+        case ui::grid::align_start:         return 0;
+        case ui::grid::align_center:        return (outer - inner) / 2;
+        case ui::grid::align_global_center: return std::max(0L, std::min(outer - inner, globalCenter - inner / 2));
+        case ui::grid::align_end:           return (outer - inner);
     }
 }
 
 RECT ui::grid::itemRect(size_t x, size_t y, size_t i, POINT origin) const {
+    auto [tw, th] = size();
     auto [w, h] = cells[i]->measure({cols[x].size, rows[y].size});
-    origin.x += cols[x].start + alignAs(cols[x].size, w, align[i].first);
-    origin.y += rows[y].start + alignAs(rows[y].size, h, align[i].second);
+    origin.x += cols[x].start + alignAs(cols[x].size, w, tw / 2 - cols[x].start, align[i].first);
+    origin.y += rows[y].start + alignAs(rows[y].size, h, th / 2 - cols[x].start, align[i].second);
     return {origin.x, origin.y, origin.x + w, origin.y + h};
 }
 

@@ -22,7 +22,13 @@ namespace ui {
         {
         }
 
-        enum alignment { align_start, align_center, align_end };
+        // Alignment rules, used when a widget is smaller than the stretchy cell
+        // it is inserted into:
+        //     align_start           Top or left
+        //     align_center          Middle of cell
+        //     align_global_center   Point closest to the center of the entire grid
+        //     align_end             Bottom or right
+        enum alignment { align_start, align_center, align_global_center, align_end };
 
         void set(size_t x /* < cols */, size_t y /* < rows */, widget* child,
                  alignment h = align_center, alignment v = align_center) {
