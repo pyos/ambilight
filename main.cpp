@@ -8,91 +8,224 @@
 #include "dxui/widgets/spacer.hpp"
 #include "dxui/widgets/wincontrol.hpp"
 
-int ui::main() {
-    ui::window window{800, 600};
-    auto onDestroy = window.onDestroy.add([&] { ui::quit(); });
+#include "arduino/arduino.h"
 
-    ui::spacer b{{50, 50}};
-    ui::button c{b};
-    ui::slider hs1, hs2;
-    ui::slider vs1, vs2;
-    hs1.setOrientation(ui::slider::deg0);
-    vs1.setOrientation(ui::slider::deg90);
-    hs2.setOrientation(ui::slider::deg180);
-    vs2.setOrientation(ui::slider::deg270);
-    ui::font segoe{IDI_FONT_SEGOE_UI};
-    ui::font segoe_bold{IDI_FONT_SEGOE_UI_BOLD};
-    ui::font cambria{IDI_FONT_CAMBRIA};
-    ui::label heading{{{L"This is a heading.", cambria, 60, 0xFFFFFFFFu, false}}};
-    ui::label label{{
-        {L"The quick ",    segoe,      12, 0xFFFFFFFFu, false},
-        {L"brown fox ",    segoe_bold, 12, 0xFFFFAAAAu, false},
-        {L"jumps over ",   segoe,      12, 0xFFFFFFFFu, false},
-        {L"the lazy dog.", segoe_bold, 12, 0xFFAAAAFFu, true},
-        {L"The quick ",    segoe,      18, 0xFFFFFFFFu, false},
-        {L"brown fox ",    segoe_bold, 18, 0xFFFFAAAAu, false},
-        {L"jumps over ",   segoe,      18, 0xFFFFFFFFu, false},
-        {L"the lazy dog.", segoe_bold, 18, 0xFFAAAAFFu, true},
-        {L"The quick ",    segoe,      32, 0xFFFFFFFFu, false},
-        {L"brown fox ",    segoe_bold, 32, 0xFFFFAAAAu, false},
-        {L"jumps over ",   segoe,      32, 0xFFFFFFFFu, false},
-        {L"the lazy dog.", segoe_bold, 32, 0xFFAAAAFFu, true},
-    }};
-    ui::grid grid{3, 5};
-    grid.set(1, 0, &heading, ui::grid::align_start);
-    grid.set(1, 2, &c);
-    grid.set(1, 1, &hs1);
-    grid.set(2, 2, &vs1);
-    grid.set(1, 3, &hs2);
-    grid.set(0, 2, &vs2);
-    grid.setColStretch(1, 1);
-    grid.setRowStretch(2, 1);
-    grid.set(1, 4, &label);
-    auto set = [&](POINT p) {
-        b.setSize(p);
-        hs1.setValue((p.x - 50) / 400.);
-        hs2.setValue((p.x - 50) / 400.);
-        vs1.setValue((p.y - 50) / 400.);
-        vs2.setValue((p.y - 50) / 400.);
+#include <string>
+
+namespace appui {
+    template <typename T>
+    struct padded : ui::spacer {
+        template <typename... Args>
+        padded(POINT padding, Args&&... args)
+            : ui::spacer({padding.x * 2, padding.y * 2})
+            , item(std::forward<Args>(args)...)
+        {
+            setChild(&item);
+        }
+
+        T item;
     };
-    auto onClick = c.onClick.add([&] {
-        auto [w, h] = b.size();
-        set({w + 10, h + 10});
-    });
-    auto setW = [&](double v) { set({(LONG)(v * 40 + 5.5) * 10, b.size().y}); };
-    auto setH = [&](double v) { set({b.size().x, (LONG)(v * 40 + 5.5) * 10}); };
-    auto onChangeW1 = hs1.onChange.add(setW);
-    auto onChangeW2 = hs2.onChange.add(setW);
-    auto onChangeH1 = vs1.onChange.add(setH);
-    auto onChangeH2 = vs2.onChange.add(setH);
 
-    ui::grid mainContentWithPadding{3, 4};
-    ui::spacer ltPad{{50, 50}};
-    ui::spacer rbPad{{50, 50}};
-    mainContentWithPadding.set(0, 0, &ltPad);
-    mainContentWithPadding.set(1, 1, &grid);
-    mainContentWithPadding.set(2, 2, &rbPad);
-    mainContentWithPadding.setPrimaryCell(1, 1);
+    // name [-] N [+]
+    struct controlled_number {
+        controlled_number(ui::grid& grid, size_t row, util::span<const wchar_t> name,
+                          size_t min, size_t max, size_t step)
+            : label({15, 15}, std::vector<ui::text_part>{{name, ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}})
+            , min(min)
+            , max(max)
+            , step(step)
+        {
+            grid.set(0, row, &label, ui::grid::align_end);
+            grid.set(1, row, &decButton);
+            grid.set(2, row, &numLabel);
+            grid.set(3, row, &incButton);
+            // Initialize the label.
+            decButton.setBorderless(true);
+            incButton.setBorderless(true);
+        }
 
-    ui::grid titlebar{4, 1};
-    ui::label title{{{L"DXUI test application", segoe, 16, 0xFFFFFFFFu, false}}};
-    title.setHideOverflow(true);
-    ui::win_minimize titlebarMinimize{window};
-    ui::win_maximize titlebarMaximize{window};
-    ui::win_close titlebarClose{window};
-    titlebar.set(0, 0, &title, ui::grid::align_global_center);
-    titlebar.set(1, 0, &titlebarMinimize);
-    titlebar.set(2, 0, &titlebarMaximize);
-    titlebar.set(3, 0, &titlebarClose);
-    titlebar.setColStretch(0, 1);
+        size_t getValue() const {
+            return value;
+        }
 
-    ui::grid mainContentWithTitlebar{1, 2};
-    mainContentWithTitlebar.set(0, 0, &titlebar);
-    mainContentWithTitlebar.set(0, 1, &mainContentWithPadding);
-    mainContentWithTitlebar.setPrimaryCell(0, 1);
-    window.setRoot(&mainContentWithTitlebar);
+        virtual void setValue(size_t v) {
+            value = std::max(std::min(v - v % step, max), min);
+            numBuffer = std::to_wstring(value);
+            numLabel.setText({{numBuffer, ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}});
+            onChange(value);
+        }
 
-    window.setBackground(0x7F000000u);
+    public:
+        util::event<size_t> onChange;
+
+    protected:
+        size_t min;
+        size_t max;
+        size_t step;
+        size_t value = 0;
+    protected:
+        // TODO use icons instead
+        ui::label decLabel{{{L"-", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}}};
+        ui::label incLabel{{{L"+", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}}};
+        padded<ui::label> label;
+        ui::label numLabel{{}};
+        ui::button decButton{decLabel};
+        ui::button incButton{incLabel};
+    private:
+        util::event<>::handle decHandler = decButton.onClick.add([this]{ setValue(value - step); });
+        util::event<>::handle incHandler = incButton.onClick.add([this]{ setValue(value + step); });
+        std::wstring numBuffer;
+    };
+
+    // name [-] ---|----------- [+] 123
+    struct controlled_slider : controlled_number {
+        controlled_slider(ui::grid& grid, size_t row, util::span<const wchar_t> name,
+                          size_t min, size_t max, size_t step)
+            : controlled_number(grid, row, name, min, max, step)
+        {
+            grid.set(2, row, &slider);
+            grid.set(4, row, &numLabel);
+        }
+
+        void setValue(size_t v) override {
+            slider.item.setValue(v, min, max, step);
+            controlled_number::setValue(v);
+        }
+
+    private:
+        padded<ui::slider> slider{{10, 15}};
+        util::event<double>::handle sliderHandler = slider.item.onChange.add([this](double) {
+            setValue(slider.item.mapValue(min, max, step)); });
+    };
+
+    struct screensetup : ui::grid {
+        screensetup()
+            : ui::grid(3, 3)
+        {
+            set(1, 1, &screen);
+            set(1, 2, &strip);
+            setColStretch(0, 1); setColStretch(1, 6); setColStretch(2, 1);
+            setRowStretch(0, 1); setRowStretch(1, 6); setRowStretch(2, 1);
+            strip.set(1, 0, &stripLeft, ui::grid::align_end);
+            strip.set(2, 0, &stripRight, ui::grid::align_start);
+            strip.setColStretch(0, 1);
+            strip.setColStretch(1, 3);
+            strip.setColStretch(2, 3);
+            strip.setColStretch(3, 1);
+        }
+
+    private:
+        static winapi::com_ptr<ID3D11Texture2D> loadTexture(ui::dxcontext& ctx) {
+            return ctx.textureFromPNG(ui::read(ui::fromBundled(IDI_SCREENSETUP), L"PNG")); }
+
+        struct fixedAspectRatio : ui::widget {
+            POINT measureMinEx() const override { return {60, 1}; }
+            POINT measureEx(POINT fit) const override {
+                return {std::min(fit.x, fit.y * 16 / 9 + 60), std::min(fit.x * 9 / 16 - 33, fit.y)}; }
+            void drawEx(ui::dxcontext&, ID3D11Texture2D*, RECT, RECT) const override {}
+        } stretch16To9;
+
+        struct screen : ui::texrect {
+            using ui::texrect::texrect;
+            winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
+                return ctx.cachedTexture<loadTexture>(); }
+            RECT getOuter() const override { return {0, 0, 128, 128}; }
+            RECT getInner() const override { return {64, 64, 64, 64}; }
+        } screen{stretch16To9};
+
+        struct hstretch : ui::widget  {
+            POINT measureMinEx() const override { return {0, 0}; }
+            POINT measureEx(POINT fit) const override { return {fit.x, 0}; }
+            void drawEx(ui::dxcontext&, ID3D11Texture2D*, RECT, RECT) const override {}
+        } stretchAnyTo0x1, stretchAnyTo0x2;
+
+        struct stripLeft : screen {
+            using screen::screen;
+            RECT getOuter() const override { return {22, 128, 64, 154}; }
+            RECT getInner() const override { return {44, 142, 44, 142}; }
+        } stripLeft{stretchAnyTo0x1};
+
+        struct stripRight : stripLeft {
+            using stripLeft::stripLeft;
+            RECT getOuter() const override { return {64, 128, 106, 154}; }
+            RECT getInner() const override { return {84, 142, 84, 142}; }
+        } stripRight{stretchAnyTo0x2};
+
+        ui::grid strip{4, 1};
+    };
+
+    // +---------------------------------+
+    // |                                 |
+    // |       [image of a screen]       |
+    // |       [with rgb corners ]       |
+    // |                                 |
+    // |  Width [-] ---|---------- [+] 1 |
+    // | Height [-] ---|---------- [+] 2 |
+    // |  Extra [-] ---|---------- [+] 3 |
+    // | Serial [-] 3 [+]        [apply] |
+    // +---------------------------------+
+    struct sizing_config : ui::grid {
+        sizing_config(size_t wv, size_t hv, size_t ev, size_t sn)
+            : ui::grid(1, 4)
+        {
+            set(0, 0, &image);
+            set(0, 1, &sliderGrid);
+            set(0, 2, &help);
+            set(0, 3, &bottomRow);
+            setRowStretch(0, 1);
+            setColStretch(0, 1);
+            sliderGrid.item.set(4, 3, &constNumWidth);
+            sliderGrid.item.setColStretch(2, 1);
+            bottomRow.item.set(5, 0, &done);
+            bottomRow.item.setColStretch(4, 1);
+            w.setValue(wv);
+            h.setValue(hv);
+            e.setValue(ev);
+            s.setValue(sn);
+        }
+
+    public:
+        util::event<size_t /* parameter */, size_t /* new value */> onChange;
+        util::event<> onDone;
+
+    private:
+        static constexpr size_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
+        screensetup image;
+        padded<ui::label> help{{35, 20},
+            std::vector<ui::text_part>{{L"Tweak the values until you get the pattern shown above.",
+                                        ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 22}}};
+        padded<ui::grid> sliderGrid{{20, 0}, 5, 4};
+        padded<ui::grid> bottomRow{{35, 20}, 6, 1};
+        // The actual limit is 1 <= w + h <= LIMIT, but sliders jumping around
+        // would probably be confusing.
+        controlled_slider w{sliderGrid.item, 0, L"Screen width",  1, LIMIT, 1};
+        controlled_slider h{sliderGrid.item, 1, L"Screen height", 1, LIMIT, 1};
+        controlled_slider e{sliderGrid.item, 2, L"Music LEDs",    2, LIMIT, 2};
+        controlled_number s{bottomRow.item,  0, L"Serial port",   1, 16,    1};
+        // A hacky way to set a constant size for the number labels:
+        ui::spacer constNumWidth{{60, 1}};
+        padded<ui::label> doneLabel{{20, 0},
+            std::vector<ui::text_part>{{L"Done", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}}};
+        ui::button done{doneLabel};
+
+        util::event<size_t>::handle wHandler = w.onChange.add([this](size_t v) { return onChange(0, v); });
+        util::event<size_t>::handle hHandler = h.onChange.add([this](size_t v) { return onChange(1, v); });
+        util::event<size_t>::handle eHandler = e.onChange.add([this](size_t v) { return onChange(2, v); });
+        util::event<size_t>::handle sHandler = s.onChange.add([this](size_t v) { return onChange(3, v); });
+        util::event<>::handle doneHandler = done.onClick.add([this]{ return onDone(); });
+    };
+}
+
+int ui::main() {
+    auto w = GetSystemMetrics(SM_CXSCREEN);
+    auto h = GetSystemMetrics(SM_CYSCREEN);
+    ui::window window{800, 800, (w - 800) / 2, (h - 800) / 2};
+    window.onDestroy.add([&] { ui::quit(); }).release();
+
+    appui::padded<appui::sizing_config> mainContent{{20, 20}, 72, 40, 76, 3};
+    mainContent.item.onDone.add([&] { window.close(); }).release();
+    window.setRoot(&mainContent);
+    window.setBackground(0x60000000u, true);
     window.show();
     return ui::dispatch();
 }
