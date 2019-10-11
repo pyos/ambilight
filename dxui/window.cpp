@@ -124,6 +124,9 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
                 }
             }
             break;
+        case WM_ACTIVATE:
+            (wParam ? window->onFocus : window->onBlur)();
+            break;
         case WM_MOUSEMOVE:
         case WM_LBUTTONUP:
         case WM_LBUTTONDOWN:

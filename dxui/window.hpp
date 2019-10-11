@@ -89,6 +89,12 @@ namespace ui {
         // Fired when the size of the window changes.
         util::event<> onResize;
 
+        // Fired when the window gains focus.
+        util::event<> onFocus;
+
+        // Fired when the window loses focus.
+        util::event<> onBlur;
+
         // Fired when the window is closed. Default handler destroys the window.
         util::event<> onClose;
 
