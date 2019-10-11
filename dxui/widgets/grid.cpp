@@ -80,7 +80,7 @@ void ui::grid::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, R
 bool ui::grid::onMouse(POINT abs, int keys) {
     widget* target = nullptr;
     auto rel = relative(abs);
-    if (cols[0].start <= rel.x || rows[0].start <= rel.y) {
+    if (cols[0].start <= rel.x && rows[0].start <= rel.y) {
         auto ci = std::upper_bound(cols.begin(), cols.end(), rel.x, [](LONG x, auto& c) { return x < c.start; });
         auto ri = std::upper_bound(rows.begin(), rows.end(), rel.y, [](LONG y, auto& r) { return y < r.start; });
         auto x = std::distance(cols.begin(), ci) - 1;
