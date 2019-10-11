@@ -1,5 +1,10 @@
 #include "window.hpp"
+
 #include <windowsx.h>
+#include <dwmapi.h>
+#pragma comment(lib, "dcomp.lib")
+#pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "uxtheme.lib")
 
 typedef enum {
     WCA_UNDEFINED,
@@ -161,6 +166,8 @@ ui::window::window(const wchar_t* name, cursor& cursor, icon& iconLg, icon& icon
         w, h, nullptr, nullptr, impl::hInstance, nullptr));
     winapi::throwOnFalse(handle);
     SetWindowLongPtr(*this, GWLP_USERDATA, (LONG_PTR)this);
+    MARGINS m = {1, 1, 1, 1};
+    DwmExtendFrameIntoClientArea(*this, &m);
 
     auto dxgiDevice = COMi(IDXGIDevice, context.raw()->QueryInterface);
     auto dxgiAdapter = COMi(IDXGIAdapter, dxgiDevice->GetParent);

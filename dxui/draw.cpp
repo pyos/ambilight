@@ -4,6 +4,8 @@
 #include "wincodec.h"
 
 #pragma comment(lib, "shlwapi.lib")
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
 
 #include <dxui/shaders/id_vertex.h>
 #include <dxui/shaders/id_pixel.h>
