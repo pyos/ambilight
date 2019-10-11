@@ -35,6 +35,21 @@ namespace ui {
             invalidate();
         }
 
+        // Set the current value, first remapping its interval to [0, 1].
+        template <typename T>
+        void setValue(T min, T max, double v) {
+            setValue((v - min) / (max - min));
+        }
+
+        // Map the current value from [0, 1] to an integer range [min, max]
+        // and update the slider's value to represent the returned one.
+        template <typename T>
+        T mapToInt(T min, T max) {
+            T r = (T)(value * (max - min) + min + .5 /* round to closest */);
+            setValue(min, max, r);
+            return r;
+        }
+
         bool onMouse(POINT abs, int keys) override {
             bool keepCapturing = true;
             switch (cap.update(keys)) {

@@ -25,6 +25,12 @@ namespace ui {
                    ui::fromBundled(resourceId + 1))
         {}
 
+        template <int resourceId>
+        static const font& loadPermanently() {
+            static const font f{resourceId};
+            return f;
+        }
+
         winapi::com_ptr<ID3D11Texture2D> loadTexture(ui::dxcontext& ctx) const {
             return ctx.textureFromPNG(texture);
         }
