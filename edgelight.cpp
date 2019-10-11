@@ -81,8 +81,7 @@ int ui::main() {
     mainContentWithPadding.set(0, 0, &ltPad);
     mainContentWithPadding.set(1, 1, &grid);
     mainContentWithPadding.set(2, 2, &rbPad);
-    mainContentWithPadding.setRowStretch(1, 1);
-    mainContentWithPadding.setColStretch(1, 1);
+    mainContentWithPadding.setPrimaryCell(1, 1);
 
     ui::grid titlebar{5, 1};
     ui::spacer titleLeftPad{{10, 1}};
@@ -101,8 +100,7 @@ int ui::main() {
     ui::grid mainContentWithTitlebar{1, 2};
     mainContentWithTitlebar.set(0, 0, &titlebar);
     mainContentWithTitlebar.set(0, 1, &mainContentWithPadding);
-    mainContentWithTitlebar.setRowStretch(1, 1);
-    mainContentWithTitlebar.setColStretch(0, 1);
+    mainContentWithTitlebar.setPrimaryCell(0, 1);
     window.setRoot(&mainContentWithTitlebar);
 
     window.setBackground(0x7F000000u);

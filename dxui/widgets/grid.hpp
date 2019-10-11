@@ -13,6 +13,11 @@ namespace ui {
     // The same process applies to rows. Then, if any stretchy cell is bigger than
     // its contents, alignment rules are applied.
     //
+    // If no rows/columns are set as stretchy, but a cell is designated as primary,
+    // any remaining space is given to it if it wants it. This allows creating
+    // generic widget containers that can be resized if and only if their contents
+    // can be resized.
+    //
     struct grid : widget {
         grid(size_t cols /* > 0 */, size_t rows /* > 0 */)
             : cells(cols * rows)
@@ -47,6 +52,16 @@ namespace ui {
             invalidateSize();
         }
 
+        void setPrimaryCell(size_t x /* < cols */, size_t y /* < rows */) {
+            primary = {x + 1, y + 1};
+            invalidateSize();
+        }
+
+        void clearPrimaryCell() {
+            primary = {0, 0};
+            invalidateSize();
+        }
+
         void onChildRelease(widget& w) override {
             // assert(w is in cells);
             std::find_if(cells.begin(), cells.end(), [&](auto& p) { return p.get() == &w; })->reset();
@@ -75,6 +90,7 @@ namespace ui {
         std::vector<std::pair<alignment, alignment>> align;
         std::vector<group> cols;
         std::vector<group> rows;
+        std::pair<size_t, size_t> primary = {0, 0};
         widget* lastMouseEvent = nullptr;
     };
 }

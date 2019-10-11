@@ -44,23 +44,33 @@ POINT ui::grid::measureEx(POINT fit) const {
                 space -= it.size = it.min;
         }
         for (bool changed = true; changed; ) {
-            LONG consumed = 0;
             changed = false;
             for (auto& it : m) {
-                it.start = consumed;
                 if (it.stretch && (it.size = space < 0 ? 0 : space * it.stretch / total) < it.min) {
                     total -= it.stretch;
                     space -= it.size = it.min;
                     it.stretch = 0;
                     changed = true;
                 }
-                consumed += it.size;
             }
         }
+        return space;
     };
     // Assume `min` in both `c` and `r` is valid from a previous call to `measureMin`.
-    allocateRemaining(cols, fit.x);
-    allocateRemaining(rows, fit.y);
+    POINT remaining = {allocateRemaining(cols, fit.x), allocateRemaining(rows, fit.y)};
+    if ((remaining.x || remaining.y) && primary.first && primary.second) {
+        auto& c = cols[primary.first - 1];
+        auto& r = rows[primary.second - 1];
+        if (auto& item = cells[(primary.first - 1) * rows.size() + (primary.second - 1)]) {
+            auto [w, h] = item->measure({remaining.x + c.size, remaining.y + r.size});
+            c.size = w;
+            r.size = h;
+        }
+    }
+    // Now that all sizes are finally set, we can compute the start offsets.
+    LONG cs = 0, rs = 0;
+    for (auto& c : cols) c.start = cs, cs += c.size;
+    for (auto& r : rows) r.start = rs, rs += r.size;
     return {cols.back().start + cols.back().size, rows.back().start + rows.back().size};
 }
 
