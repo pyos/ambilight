@@ -81,7 +81,7 @@
   </ItemDefinitionGroup>
 
   <ItemGroup>
-    <ClCompile Include="edgelight.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
+    <ClCompile Include="main.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="dxui/base.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="dxui/draw.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="dxui/resource.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
@@ -116,10 +116,7 @@
       <HeaderFileOutput>$(OutDir)/dxui/shaders/id_vertex.h</HeaderFileOutput>
       <ObjectFileOutput />
     </FxCompile>
-    <ResourceCompile Include="edgelight.rc" />
-    <Image Include="data\app.ico" />
-    <Image Include="data\widgets.png" />
-    <EmbeddedResource Include="data\widgets.txt" />
+    <ResourceCompile Include="resource.rc" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

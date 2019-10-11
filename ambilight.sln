@@ -1,6 +1,6 @@
 
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "edgelight", "edgelight.vcxproj", "{05050918-71E9-AF87-0B3C-6F34D471A55A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ambilight", "ambilight.vcxproj", "{05050918-71E9-AF87-0B3C-6F34D471A55A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
