@@ -83,19 +83,17 @@ int ui::main() {
     mainContentWithPadding.set(2, 2, &rbPad);
     mainContentWithPadding.setPrimaryCell(1, 1);
 
-    ui::grid titlebar{5, 1};
-    ui::spacer titleLeftPad{{10, 1}};
+    ui::grid titlebar{4, 1};
     ui::label title{{{L"DXUI test application", segoe, 16, 0xFFFFFFFFu, false}}};
     title.setHideOverflow(true);
     ui::win_minimize titlebarMinimize{window};
     ui::win_maximize titlebarMaximize{window};
     ui::win_close titlebarClose{window};
-    titlebar.set(0, 0, &titleLeftPad);
-    titlebar.set(1, 0, &title, ui::grid::align_global_center);
-    titlebar.set(2, 0, &titlebarMinimize);
-    titlebar.set(3, 0, &titlebarMaximize);
-    titlebar.set(4, 0, &titlebarClose);
-    titlebar.setColStretch(1, 1);
+    titlebar.set(0, 0, &title, ui::grid::align_global_center);
+    titlebar.set(1, 0, &titlebarMinimize);
+    titlebar.set(2, 0, &titlebarMaximize);
+    titlebar.set(3, 0, &titlebarClose);
+    titlebar.setColStretch(0, 1);
 
     ui::grid mainContentWithTitlebar{1, 2};
     mainContentWithTitlebar.set(0, 0, &titlebar);
