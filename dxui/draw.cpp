@@ -5,10 +5,9 @@
 
 #pragma comment(lib, "shlwapi.lib")
 
-#include <dxui/id_vertex.h>
-#include <dxui/id_color.h>
-#include <dxui/id_pixel.h>
-#include <dxui/id_distance_pixel.h>
+#include <dxui/shaders/id_vertex.h>
+#include <dxui/shaders/id_pixel.h>
+#include <dxui/shaders/distance_color.h>
 
 ui::dxcontext::dxcontext() {
     D3D_FEATURE_LEVEL level;
@@ -27,14 +26,14 @@ ui::dxcontext::dxcontext() {
     winapi::throwOnFalse(hr);
 
     D3D11_INPUT_ELEMENT_DESC layout[] = {
-        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0}
+        {"POSITION",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,       0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"BLENDWEIGHT", 0, DXGI_FORMAT_R32_FLOAT,          0, 36, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
     vertexId = COMe(ID3D11VertexShader, device->CreateVertexShader, g_id_vertex, ARRAYSIZE(g_id_vertex), nullptr);
     pixelId = COMe(ID3D11PixelShader, device->CreatePixelShader, g_id_pixel, ARRAYSIZE(g_id_pixel), nullptr);
-    colorId = COMe(ID3D11PixelShader, device->CreatePixelShader, g_id_color, ARRAYSIZE(g_id_color), nullptr);
-    pixelDistanceDecoder = COMe(ID3D11PixelShader, device->CreatePixelShader, g_id_distance_pixel, ARRAYSIZE(g_id_distance_pixel), nullptr);
+    colorDistance = COMe(ID3D11PixelShader, device->CreatePixelShader, g_distance_color, ARRAYSIZE(g_distance_color), nullptr);
     inputLayout = COMe(ID3D11InputLayout, device->CreateInputLayout, layout, ARRAYSIZE(layout), g_id_vertex, ARRAYSIZE(g_id_vertex));
     context->IASetInputLayout(inputLayout);
 
@@ -83,8 +82,10 @@ ui::dxcontext::dxcontext() {
 
 void ui::dxcontext::clear(ID3D11Texture2D* target, RECT area, uint32_t color) {
     ui::vertex quad[] = {QUAD(-1, +1, +1, -1, 0, 0, 0, 0, 0)};
-    for (auto& vertex : quad)
+    for (auto& vertex : quad) {
         vertex.clr = ARGB2CLR(color);
+        vertex.blw = 0.f;
+    }
     auto rt = COMe(ID3D11RenderTargetView, device->CreateRenderTargetView, target, nullptr);
     auto vb = buffer(util::span<ui::vertex>(quad).reinterpret<const uint8_t>(), D3D11_BIND_VERTEX_BUFFER);
     UINT stride = sizeof(vertex);
@@ -94,7 +95,7 @@ void ui::dxcontext::clear(ID3D11Texture2D* target, RECT area, uint32_t color) {
     D3D11_VIEWPORT vp = {0, 0, (FLOAT)targetDesc.Width, (FLOAT)targetDesc.Height, 0, 1};
     context->RSSetViewports(1, &vp);
     context->RSSetScissorRects(1, &area);
-    context->PSSetShader(colorId, nullptr, 0);
+    context->PSSetShader(pixelId, nullptr, 0);
     context->OMSetBlendState(blendClear, nullptr, 0xFFFFFFFFU);
     context->OMSetRenderTargets(1, &rt, nullptr);
     context->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
@@ -121,7 +122,7 @@ void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util:
     D3D11_VIEWPORT vp = {0, 0, (FLOAT)targetDesc.Width, (FLOAT)targetDesc.Height, 0, 1};
     context->RSSetViewports(1, &vp);
     context->RSSetScissorRects(1, &cull);
-    context->PSSetShader(distanceCoded ? pixelDistanceDecoder : pixelId, nullptr, 0);
+    context->PSSetShader(distanceCoded ? colorDistance : pixelId, nullptr, 0);
     context->OMSetBlendState(blendOver, nullptr, 0xFFFFFFFFU);
     context->OMSetRenderTargets(1, &rt, nullptr);
     context->PSSetShaderResources(0, 1, &sr);

@@ -17,8 +17,8 @@
 //     ui::vertex vs[] = {QUAD(...)};
 //
 #define QUAD(L, T, R, B, Z, tL, tT, tR, tB) \
-    {{L, B, Z}, {}, {tL, tB}}, {{L, T, Z}, {}, {tL, tT}}, {{R, B, Z}, {}, {tR, tB}}, \
-    {{R, B, Z}, {}, {tR, tB}}, {{L, T, Z}, {}, {tL, tT}}, {{R, T, Z}, {}, {tR, tT}}
+    {{L, B, Z}, {}, {tL, tB}, 1.f}, {{L, T, Z}, {}, {tL, tT}, 1.f}, {{R, B, Z}, {}, {tR, tB}, 1.f}, \
+    {{R, B, Z}, {}, {tR, tB}, 1.f}, {{L, T, Z}, {}, {tL, tT}, 1.f}, {{R, T, Z}, {}, {tR, tT}, 1.f}
 
 // Same as `QUAD`, but the texture rectangle is rotated 90 degrees clockwise.
 //
@@ -27,8 +27,8 @@
 //       a 270 degree rotation.
 //
 #define QUADR(L, T, R, B, Z, tL, tT, tR, tB) \
-    {{L, B, Z}, {}, {tR, tB}}, {{L, T, Z}, {}, {tL, tB}}, {{R, B, Z}, {}, {tR, tT}}, \
-    {{R, B, Z}, {}, {tR, tT}}, {{L, T, Z}, {}, {tL, tB}}, {{R, T, Z}, {}, {tL, tT}}
+    {{L, B, Z}, {}, {tR, tB}, 1.f}, {{L, T, Z}, {}, {tL, tB}, 1.f}, {{R, B, Z}, {}, {tR, tT}, 1.f}, \
+    {{R, B, Z}, {}, {tR, tT}, 1.f}, {{L, T, Z}, {}, {tL, tB}, 1.f}, {{R, T, Z}, {}, {tL, tT}, 1.f}
 
 // Same as `QUAD`, but all coordinates are in pixels. These are suitable
 // for passing to `ui::dxcontext::draw`.
@@ -80,10 +80,15 @@ namespace ui {
                 std::min(a.right, b.right), std::min(a.bottom, b.bottom)};
     }
 
+    static constexpr bool isSubRect(RECT a, RECT b) {
+        return a.left >= b.left && a.top >= b.top && a.right <= b.right && a.bottom <= b.bottom;
+    }
+
     struct vertex {
         DirectX::XMFLOAT3 pos;
         DirectX::XMFLOAT4 clr;
         DirectX::XMFLOAT2 tex;
+        float             blw;
     };
 
     struct dxcontext {
@@ -140,8 +145,7 @@ namespace ui {
         winapi::com_ptr<ID3D11DeviceContext> context;
         winapi::com_ptr<ID3D11VertexShader> vertexId;
         winapi::com_ptr<ID3D11PixelShader> pixelId;
-        winapi::com_ptr<ID3D11PixelShader> colorId;
-        winapi::com_ptr<ID3D11PixelShader> pixelDistanceDecoder;
+        winapi::com_ptr<ID3D11PixelShader> colorDistance;
         winapi::com_ptr<ID3D11InputLayout> inputLayout;
         winapi::com_ptr<ID3D11SamplerState> linear;
         winapi::com_ptr<ID3D11BlendState> blendOver;

@@ -5,17 +5,14 @@ struct PS_INPUT {
     float4 Pos : SV_POSITION;
     float4 Clr : COLOR;
     float2 Tex : TEXCOORD;
+    float  Blw : BLENDWEIGHT;
 };
 
 float4 id_pixel(PS_INPUT input) : SV_Target {
-    return tx.Sample(samLinear, input.Tex);
+    return input.Clr * (1 - input.Blw) + tx.Sample(samLinear, input.Tex) * input.Blw;
 }
 
-float4 id_color(PS_INPUT input) : SV_Target {
-    return input.Clr;
-}
-
-float4 id_distance_pixel(PS_INPUT input) : SV_Target {
+float4 distance_color(PS_INPUT input) : SV_Target {
     float x = tx.Sample(samLinear, input.Tex).y;
     float s = 1 / fwidth(x);
     float d = (x - 0.5) * s;

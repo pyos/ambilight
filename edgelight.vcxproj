@@ -93,32 +93,25 @@
     <ClCompile Include="captureAudio.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="captureVideo.cpp"><AdditionalOptions>/std:c++17 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="kiss_fft.c" /-->
-    <FxCompile Include="dxui/id_pixel.hlsl">
+    <FxCompile Include="dxui/shaders_px.hlsl">
       <EntryPointName>id_pixel</EntryPointName>
       <ShaderType>Pixel</ShaderType>
       <ShaderModel>4.1</ShaderModel>
-      <HeaderFileOutput>$(OutDir)/dxui/id_pixel.h</HeaderFileOutput>
+      <HeaderFileOutput>$(OutDir)/dxui/shaders/id_pixel.h</HeaderFileOutput>
       <ObjectFileOutput />
     </FxCompile>
-    <FxCompile Include="dxui/id_pixel.hlsl">
-      <EntryPointName>id_color</EntryPointName>
+    <FxCompile Include="dxui/shaders_px.hlsl">
+      <EntryPointName>distance_color</EntryPointName>
       <ShaderType>Pixel</ShaderType>
       <ShaderModel>4.1</ShaderModel>
-      <HeaderFileOutput>$(OutDir)/dxui/id_color.h</HeaderFileOutput>
+      <HeaderFileOutput>$(OutDir)/dxui/shaders/distance_color.h</HeaderFileOutput>
       <ObjectFileOutput />
     </FxCompile>
-    <FxCompile Include="dxui/id_pixel.hlsl">
-      <EntryPointName>id_distance_pixel</EntryPointName>
-      <ShaderType>Pixel</ShaderType>
-      <ShaderModel>4.1</ShaderModel>
-      <HeaderFileOutput>$(OutDir)/dxui/id_distance_pixel.h</HeaderFileOutput>
-      <ObjectFileOutput />
-    </FxCompile>
-    <FxCompile Include="dxui/id_vertex.hlsl">
+    <FxCompile Include="dxui/shaders_vx.hlsl">
       <EntryPointName>id_vertex</EntryPointName>
       <ShaderType>Vertex</ShaderType>
       <ShaderModel>4.1</ShaderModel>
-      <HeaderFileOutput>$(OutDir)/dxui/id_vertex.h</HeaderFileOutput>
+      <HeaderFileOutput>$(OutDir)/dxui/shaders/id_vertex.h</HeaderFileOutput>
       <ObjectFileOutput />
     </FxCompile>
     <ResourceCompile Include="edgelight.rc" />
