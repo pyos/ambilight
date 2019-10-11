@@ -41,7 +41,7 @@ POINT ui::grid::measureEx(POINT fit) const {
             else
                 space -= it.size = it.min;
         }
-        for (bool changed = true; total != 0 && changed; ) {
+        for (bool changed = true; changed; ) {
             LONG consumed = 0;
             changed = false;
             for (auto& it : m) {
