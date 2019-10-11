@@ -72,15 +72,6 @@ void ui::window::unregister_class(const wchar_t* name) {
     UnregisterClass(name, ui::impl::hInstance);
 }
 
-static POINT windowExtraSpace(HWND handle, POINT sz) {
-    RECT client, total;
-    GetClientRect(handle, &client);
-    GetWindowRect(handle, &total);
-    auto dw = (client.left - total.left) + (total.right - client.right);
-    auto dh = (client.top - total.top) + (total.bottom - client.bottom);
-    return {sz.x + dw, sz.y + dh};
-}
-
 LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
     auto window = reinterpret_cast<ui::window*>(GetWindowLongPtr(handle, GWLP_USERDATA));
     if (window) switch (msg) {
@@ -103,24 +94,23 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
             break;
         case WM_GETMINMAXINFO:
             if (auto root = window->getRoot())
-                reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = windowExtraSpace(handle, root->measureMin());
+                reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = root->measureMin();
             break;
         case WM_SIZING:
             if (auto root = window->getRoot()) {
                 auto r = reinterpret_cast<RECT*>(lParam);
-                auto [a, b] = windowExtraSpace(handle, {0, 0});
-                auto [w, h] = root->measure({r->right - r->left - a, r->bottom - r->top - b});
-                if (w + a != r->right - r->left) switch (wParam) {
+                auto [w, h] = root->measure({r->right - r->left, r->bottom - r->top});
+                if (w != r->right - r->left) switch (wParam) {
                     case WMSZ_BOTTOMLEFT:
                     case WMSZ_TOPLEFT:
-                    case WMSZ_LEFT: r->left = r->right - w - a; break;
-                    default: r->right = r->left + w + a; break;
+                    case WMSZ_LEFT: r->left = r->right - w; break;
+                    default: r->right = r->left + w; break;
                 }
-                if (h + b != r->bottom - r->top) switch (wParam) {
+                if (h != r->bottom - r->top) switch (wParam) {
                     case WMSZ_TOPRIGHT:
                     case WMSZ_TOPLEFT:
-                    case WMSZ_TOP: r->top = r->bottom - h - a; break;
-                    default: r->bottom = r->top + h + b; break;
+                    case WMSZ_TOP: r->top = r->bottom - h; break;
+                    default: r->bottom = r->top + h; break;
                 }
             }
             break;
@@ -160,6 +150,12 @@ ui::window::window(int w, int h) {
     SetWindowLongPtr(*this, GWLP_USERDATA, (LONG_PTR)this);
     MARGINS m = {1, 1, 1, 1};
     DwmExtendFrameIntoClientArea(*this, &m);
+    // Windows will not give us a WM_NCCALCSIZE until the window gets resized,
+    // so do that preemptively.
+    RECT rect;
+    GetWindowRect(*this, &rect);
+    MoveWindow(*this, rect.left, rect.top, rect.right - rect.left + 1, rect.bottom - rect.top + 1, TRUE);
+    MoveWindow(*this, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, TRUE);
 
     auto dxgiDevice = COMi(IDXGIDevice, context.raw()->QueryInterface);
     auto dxgiAdapter = COMi(IDXGIAdapter, dxgiDevice->GetParent);
@@ -189,20 +185,15 @@ void ui::window::draw(RECT dirty) {
 }
 
 void ui::window::drawImmediate(RECT scheduled) {
-    RECT rect, total;
-    GetClientRect(*this, &rect);
-    GetWindowRect(*this, &total);
-    POINT extra = {(rect.left - total.left) + (total.right - rect.right),
-                   (rect.top - total.top) + (total.bottom - rect.bottom)};
+    RECT rect;
+    GetWindowRect(*this, &rect);
     if (root) {
         POINT c = {rect.right - rect.left, rect.bottom - rect.top};
         POINT w = root->measure(c);
         if (w.x != c.x || w.y != c.y) {
             rect.right = rect.left + w.x;
             rect.bottom = rect.top + w.y;
-            total.right = total.left + w.x + extra.x;
-            total.bottom = total.top + w.y + extra.y;
-            MoveWindow(*this, total.left, total.top, total.right - total.left, total.bottom - total.top, TRUE);
+            MoveWindow(*this, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, TRUE);
         }
     }
 
