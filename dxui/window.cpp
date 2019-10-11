@@ -219,10 +219,10 @@ void ui::window::drawImmediate(RECT scheduled) {
     winapi::throwOnFalse(swapChain->Present(1, 0));
 }
 
-void ui::window::setBackground(uint32_t tint) {
+void ui::window::setBackground(uint32_t tint, bool acrylic) {
     ACCENT_POLICY ap = {};
     if ((tint >> 24) != 0xFF) {
-        ap.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
+        ap.AccentState = acrylic ? ACCENT_ENABLE_ACRYLICBLURBEHIND : ACCENT_ENABLE_BLURBEHIND;
         ap.AccentFlags = 2;
         // This value should be ABGR, not ARGB.
         ap.GradientColor = tint & 0xFF00FF00u | (tint & 0xFF) << 16 | (tint & 0xFF0000) >> 16;

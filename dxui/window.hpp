@@ -50,8 +50,8 @@ namespace ui {
         bool isMaximized() { return IsZoomed(*this); }
 
         // Set the background of the window, in ARGB format. Default is white.
-        // Transparent colors use the Windows 10 acrylic blur effect.
-        void setBackground(uint32_t tint);
+        // Transparent colors use the Windows 10 blur effect.
+        void setBackground(uint32_t tint, bool acrylic = false);
 
         // Enable or disable the ability to drag the window by any area that does not
         // handle mouse clicks otherwise.
