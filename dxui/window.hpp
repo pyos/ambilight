@@ -20,7 +20,7 @@ namespace ui {
     // NOTE: the window is initially hidden.
     //
     struct window : private widget_parent {
-        window(int w, int h);
+        window(int w, int h, int x = CW_USEDEFAULT, int y = CW_USEDEFAULT);
 
         // Cast this window to a raw WinAPI handle.
         operator HWND() const { return handle.get(); }
