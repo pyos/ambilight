@@ -8,7 +8,7 @@ namespace ui {
     namespace impl {
         extern HINSTANCE hInstance;
 
-        template <typename T, void (*F)(T)>
+        template <typename T, BOOL (*F)(T)>
         struct deleter {
             void operator()(T x) {
                 F(x);
@@ -16,15 +16,7 @@ namespace ui {
         };
 
         template <typename T, BOOL (*F)(T)>
-        void adapt_stdcall(T x) {
-            F(x);
-        }
-
-        template <typename T, void (*F)(T)>
-        using holder_ex = std::unique_ptr<std::remove_pointer_t<T>, deleter<T, F>>;
-
-        template <typename T, BOOL (*F)(T)>
-        using holder = holder_ex<T, adapt_stdcall<T, F>>;
+        using holder = std::unique_ptr<std::remove_pointer_t<T>, deleter<T, F>>;
     }
 
     // Main entry point. Implement this in a unit somewhere.

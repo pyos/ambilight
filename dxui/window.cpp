@@ -81,7 +81,7 @@ static POINT windowExtraSpace(HWND handle, POINT sz) {
     return {sz.x + dw, sz.y + dh};
 }
 
-static LRESULT windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
+LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
     auto window = reinterpret_cast<ui::window*>(GetWindowLongPtr(handle, GWLP_USERDATA));
     if (window) switch (msg) {
         case WM_SHOWWINDOW:
@@ -149,20 +149,8 @@ static LRESULT windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
     return DefWindowProc(handle, msg, wParam, lParam);
 }
 
-ui::window::window(const wchar_t* name, cursor& cursor, icon& iconLg, icon& iconSm, int w, int h) {
-    WNDCLASSEX wc = {};
-    wc.cbSize        = sizeof(WNDCLASSEX);
-    wc.lpszClassName = name;
-    wc.lpfnWndProc   = windowProc;
-    wc.hInstance     = ui::impl::hInstance;
-    wc.hCursor       = cursor.get();
-    wc.hIcon         = iconLg.get();
-    wc.hIconSm       = iconSm.get();
-    wc.hbrBackground = CreateSolidBrush(0x00000000);
-    wc.style         = CS_HREDRAW | CS_VREDRAW;
-    winapi::throwOnFalse(RegisterClassEx(&wc));
-    wclass.reset(name);
-    handle.reset(CreateWindowEx(0, name, L"", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+ui::window::window(int w, int h) {
+    handle.reset(CreateWindowEx(0, L"__mainClass", L"", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
         w, h, nullptr, nullptr, impl::hInstance, nullptr));
     winapi::throwOnFalse(handle);
     SetWindowLongPtr(*this, GWLP_USERDATA, (LONG_PTR)this);

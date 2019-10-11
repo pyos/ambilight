@@ -20,7 +20,7 @@ namespace ui {
     // NOTE: the window is initially hidden.
     //
     struct window : private widget_parent {
-        window(const wchar_t* name, cursor& cursor, icon& iconLg, icon& iconSm, int w, int h);
+        window(int w, int h);
 
         // Cast this window to a raw WinAPI handle.
         operator HWND() const { return handle.get(); }
@@ -110,7 +110,6 @@ namespace ui {
         dxcontext context;
         widget_handle root;
         widget* mouseCapture = nullptr;
-        impl::holder_ex<const wchar_t*, unregister_class> wclass;
         impl::holder<HWND, CloseWindow> handle;
         winapi::com_ptr<IDXGISwapChain1> swapChain;
         winapi::com_ptr<IDCompositionDevice> device;
@@ -122,4 +121,8 @@ namespace ui {
         bool dragByEmptyAreas = true;
         POINT dragBy = {-1, -1};
     };
+
+    namespace impl {
+        LRESULT windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam);
+    }
 }

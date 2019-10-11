@@ -9,11 +9,7 @@
 #include "dxui/widgets/wincontrol.hpp"
 
 int ui::main() {
-    auto asd = ui::read(ui::fromBundled(IDI_WIDGETS), L"PNG");
-    auto cursor = ui::loadCursor(ui::fromFile(IDC_ARROW));
-    auto iconLg = ui::loadNormalIcon(ui::fromBundled(IDI_APP));
-    auto iconSm = ui::loadSmallIcon(ui::fromBundled(IDI_APP));
-    ui::window window{L"edgelight", cursor, iconLg, iconSm, 800, 600};
+    ui::window window{800, 600};
     auto onDestroy = window.onDestroy.add([&] { ui::quit(); return true; });
 
     ui::spacer b{{50, 50}};
