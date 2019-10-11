@@ -6,6 +6,12 @@
  11,  11,    0,   0,  button inner
  11,  33,    0,   0,  button inner hover
  11,  55,    0,   0,  button inner active
+ 38,   0,   22,  22,  button borderless outer
+  0,  66,   22,  22,  button borderless outer hover
+ 22,  71,   22,  22,  button borderless outer active
+ 49,  11,    0,   0,  button borderless inner
+ 11,  77,    0,   0,  button borderless inner hover
+ 33,  82,    0,   0,  button borderless inner active
 # sliders
  22,   0,   15,  32,  slider track
  22,  32,   15,   3,  slider groove

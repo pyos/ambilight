@@ -32,6 +32,11 @@ namespace ui {
             setState(idle);
         }
 
+        void setBorderless(bool value = true) {
+            borderless = value;
+            invalidate();
+        }
+
     public:
         // Emitted when the left mouse button is released over this widget.
         util::event<> onClick;
@@ -52,5 +57,6 @@ namespace ui {
     private:
         state currentState = idle;
         capture_state cap;
+        bool borderless = false;
     };
 }
