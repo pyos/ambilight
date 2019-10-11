@@ -10,7 +10,7 @@
 
 int ui::main() {
     ui::window window{800, 600};
-    auto onDestroy = window.onDestroy.add([&] { ui::quit(); return true; });
+    auto onDestroy = window.onDestroy.add([&] { ui::quit(); });
 
     ui::spacer b{{50, 50}};
     ui::button c{b};
@@ -58,18 +58,9 @@ int ui::main() {
     auto onClick = c.onClick.add([&] {
         auto [w, h] = b.size();
         set({w + 10, h + 10});
-        return true;
     });
-    auto setW = [&](double v) {
-        auto [_, h] = b.size();
-        set({(LONG)(v * 40 + 5.5) * 10, h});
-        return true;
-    };
-    auto setH = [&](double v) {
-        auto [w, _] = b.size();
-        set({w, (LONG)(v * 40 + 5.5) * 10});
-        return true;
-    };
+    auto setW = [&](double v) { set({(LONG)(v * 40 + 5.5) * 10, b.size().y}); };
+    auto setH = [&](double v) { set({b.size().x, (LONG)(v * 40 + 5.5) * 10}); };
     auto onChangeW1 = hs1.onChange.add(setW);
     auto onChangeW2 = hs2.onChange.add(setW);
     auto onChangeH1 = vs1.onChange.add(setH);

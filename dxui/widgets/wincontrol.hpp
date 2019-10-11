@@ -9,7 +9,7 @@ namespace ui {
     struct name : button {                                                              \
         name(window& target)                                                            \
             : button(icon)                                                              \
-            , doIt(onClick.add([&]{ clickAction; return true; }))                       \
+            , doIt(onClick.add([&]{ clickAction; }))                                    \
         {}                                                                              \
     protected:                                                                          \
         winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const override;     \

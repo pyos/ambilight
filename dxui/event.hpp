@@ -28,8 +28,12 @@ namespace util {
 
         using handle = std::unique_ptr<event, unsubscribe>;
 
-        handle add(std::function<bool(ArgTypes...)> cb) {
-            callbacks.emplace_back(std::move(cb));
+        template <typename F /* = bool(ArgTypes...) or void(ArgTypes...) */>
+        handle add(F&& cb) {
+            if constexpr (std::is_same_v<std::invoke_result_t<F, ArgTypes...>, void>)
+                callbacks.emplace_back([cb = std::forward<F>(cb)](ArgTypes... args) { cb(args...); return true; });
+            else
+                callbacks.emplace_back(std::forward<F>(cb));
             auto it = callbacks.end();
             return {this, unsubscribe{--it}};
         }
