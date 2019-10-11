@@ -448,9 +448,8 @@ namespace ui {
         // based antialiasing.
         int nativeSize() const;
 
-        // Load the ASCII symbols as an 256-element array. Symbols not available
-        // in the font have size and offset 0.
-        const font_symbol* loadAscii() const;
+        // Retrieve info for a particular code point.
+        const font_symbol& operator[](wchar_t) const;
 
     private:
         util::span<const uint8_t> texture;
@@ -503,6 +502,7 @@ namespace ui {
         uint32_t fontSize;
         uint32_t fontColor = 0xFF000000;
         double lineHeight;
+        mutable POINT origin;
         // TODO line alignment
     };
 }

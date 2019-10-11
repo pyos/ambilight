@@ -274,12 +274,12 @@ void ui::slider::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total,
 }
 
 int ui::font::nativeSize() const {
-    if (nativeSize_ < 0)
-        loadAscii();
+    (*this)[0];
     return nativeSize_;
 }
 
-const ui::font_symbol* ui::font::loadAscii() const {
+const ui::font_symbol& ui::font::operator[](wchar_t point) const {
+    static const ui::font_symbol empty = {};
     if (ascii.empty()) {
         ascii.resize(256);
         readPseudoCSV<8>(charmap, [&](size_t lineno, util::span<const char> columns[8]) {
@@ -297,53 +297,54 @@ const ui::font_symbol* ui::font::loadAscii() const {
             }
         });
     }
-    return ascii.data();
+    return point < 256 ? ascii[point] : empty;
 }
 
 POINT ui::label::measureMinEx() const {
     POINT ret = {0, 0};
     long x = 0;
     long y = 0;
-    // TODO non-ASCII text
-    const auto& table = font->loadAscii();
+    long originX = 0;
     splitString<const wchar_t>(text, L'\n', 0, [&](size_t, util::span<const wchar_t> line) {
         long w = 0;
-        if (auto cs = strip(line, [](wchar_t c) { return c >= 256; })) {
-            // For the first and last character, we also want to include the space
-            // that is overlapped by other characters.
-            wchar_t a = cs[0], b = cs[cs.size() - 1];
-            w += table[a].originX;
-            w += table[b].w - table[b].advance - table[b].originX;
-            for (wchar_t c : cs) if (c < 256) w += table[c].advance;
+        if (line) {
+            // Align the text so that there is a straight vertical line going through
+            // each text line's first character's origin.
+            originX = std::max<long>(originX, (*font)[line[0]].originX);
+            for (wchar_t c : line) w += (*font)[c].advance;
+            // Reserve some space on the right for the last character's horizontal overflow.
+            auto& b = (*font)[line[line.size() - 1]];
+            w += b.w - b.advance - b.originX;
         }
         x  = std::max(x, w);
         y += font->nativeSize() * lineHeight;
     });
+    origin = {originX, (LONG)(font->nativeSize() * lineHeight / 4)};
     double scale = (double)fontSize / font->nativeSize();
-    return {(LONG)(x * scale + 0.5), (LONG)(y * scale + 0.5)};
+    return {(LONG)((x + originX) * scale + 0.5), (LONG)(y * scale + 0.5)};
 }
 
 void ui::label::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
+    measureMin(); // Make sure the baseline is set to the correct value.
     std::vector<ui::vertex> quads;
     quads.reserve(text.size() * 6);
     // TODO use DirectWrite or something.
     double scale = (double)fontSize / font->nativeSize();
-    long y = -font->nativeSize() * lineHeight / 4;
-    // TODO non-ASCII text
-    const auto& table = font->loadAscii();
+    long y = -origin.y;
     splitString<const wchar_t>(text, L'\n', 0, [&](size_t, util::span<const wchar_t> line) {
         y += font->nativeSize() * lineHeight;
         if (auto cs = strip(line, [](wchar_t c) { return c >= 256; })) {
-            long x = table[cs[0]].originX;
-            for (wchar_t c : cs) if (c < 256) {
-                RECT s = {table[c].x, table[c].y, table[c].x + table[c].w, table[c].y + table[c].h};
-                double tl = (x - table[c].originX) * scale + total.left
-                     , tt = (y - table[c].originY) * scale + total.top
-                     , tr = (x - table[c].originX + table[c].w) * scale + total.left
-                     , tb = (y - table[c].originY + table[c].h) * scale + total.top;
+            long x = origin.x;
+            for (wchar_t c : cs) {
+                auto& info = (*font)[c];
+                RECT s = {info.x, info.y, info.x + info.w, info.y + info.h};
+                double tl = (x - info.originX) * scale + total.left
+                     , tt = (y - info.originY) * scale + total.top
+                     , tr = (x - info.originX + info.w) * scale + total.left
+                     , tb = (y - info.originY + info.h) * scale + total.top;
                 ui::vertex quad[] = {QUADP(tl, tt, tr, tb, 0, s.left, s.top, s.right, s.bottom)};
                 quads.insert(quads.end(), std::begin(quad), std::end(quad));
-                x += table[c].advance;
+                x += info.advance;
             }
         }
     });
