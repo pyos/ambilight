@@ -111,6 +111,7 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
             }
             break;
         case WM_ACTIVATE:
+        case WM_ACTIVATEAPP:
             (wParam ? window->onFocus : window->onBlur)();
             break;
         case WM_MOUSEMOVE:
@@ -150,9 +151,9 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
     return DefWindowProc(handle, msg, wParam, lParam);
 }
 
-ui::window::window(int w, int h, int x, int y) {
+ui::window::window(int w, int h, int x, int y, window* parent) {
     handle.reset(CreateWindowEx(0, L"__mainClass", L"", WS_OVERLAPPEDWINDOW, x, y,
-        w, h, nullptr, nullptr, impl::hInstance, nullptr));
+        w, h, parent ? parent->handle.get() : nullptr, nullptr, impl::hInstance, nullptr));
     winapi::throwOnFalse(handle);
     SetWindowLongPtr(*this, GWLP_USERDATA, (LONG_PTR)this);
     MARGINS m = {1, 1, 1, 1};
@@ -161,8 +162,8 @@ ui::window::window(int w, int h, int x, int y) {
     // so do that preemptively.
     RECT rect;
     GetWindowRect(*this, &rect);
-    MoveWindow(*this, rect.left, rect.top, rect.right - rect.left + 1, rect.bottom - rect.top + 1, TRUE);
-    MoveWindow(*this, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, TRUE);
+    rect.right += 1; move(rect);
+    rect.right -= 1; move(rect);
 
     auto dxgiDevice = COMi(IDXGIDevice, context.raw()->QueryInterface);
     auto dxgiAdapter = COMi(IDXGIAdapter, dxgiDevice->GetParent);
@@ -200,7 +201,7 @@ void ui::window::drawImmediate(RECT scheduled) {
         if (w.x != c.x || w.y != c.y) {
             rect.right = rect.left + w.x;
             rect.bottom = rect.top + w.y;
-            MoveWindow(*this, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, TRUE);
+            move(rect);
         }
     }
 

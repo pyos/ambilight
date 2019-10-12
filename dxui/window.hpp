@@ -20,7 +20,7 @@ namespace ui {
     // NOTE: the window is initially hidden.
     //
     struct window : private widget_parent {
-        window(int w, int h, int x = CW_USEDEFAULT, int y = CW_USEDEFAULT);
+        window(int w, int h, int x = CW_USEDEFAULT, int y = CW_USEDEFAULT, window* parent = nullptr);
 
         // Cast this window to a raw WinAPI handle.
         operator HWND() const { return handle.get(); }
@@ -29,6 +29,11 @@ namespace ui {
         void show() {
             drawImmediate({0, 0, (LONG)w, (LONG)h});
             ShowWindow(*this, SW_SHOWNORMAL);
+        }
+
+        // Make it float on top of everything else.
+        void setTopmost(bool permanently = false) {
+            SetWindowPos(*this, permanently ? HWND_TOPMOST : HWND_TOP, 0, 0, 0, 0, SWP_NOSIZE|SWP_NOMOVE);
         }
 
         // Maximize this window.
@@ -42,6 +47,9 @@ namespace ui {
 
         // Close this window.
         void close() { SendMessage(*this, WM_CLOSE, 0, 0); }
+
+        // Move this window to a specified position on screen.
+        void move(RECT p) { MoveWindow(*this, p.left, p.top, p.right - p.left, p.bottom - p.top, TRUE); }
 
         // Whether the window is visible, i.e. not hidden or minimized.
         bool isVisible() { return IsWindowVisible(*this); }
