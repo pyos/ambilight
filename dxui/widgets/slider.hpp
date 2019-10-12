@@ -71,6 +71,11 @@ namespace ui {
         // Emitted when the current value changes.
         util::event<double> onChange;
 
+    protected:
+        virtual winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const;
+        virtual RECT getTrack() const;
+        virtual RECT getGroove() const;
+
     private:
         bool vertical() const { return currentOrientation == deg90  || currentOrientation == deg270; }
         bool inverted() const { return currentOrientation == deg180 || currentOrientation == deg270; }
