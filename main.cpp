@@ -63,9 +63,8 @@ namespace appui {
         size_t step;
         size_t value = 0;
     protected:
-        // TODO use icons instead
-        ui::label decLabel{{{L"-", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}}};
-        ui::label incLabel{{{L"+", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}}};
+        ui::label decLabel{{{L"\uf068", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
+        ui::label incLabel{{{L"\uf067", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
         padded<ui::label> label;
         ui::label numLabel{{}};
         ui::button decButton{decLabel};
@@ -131,9 +130,9 @@ namespace appui {
             void drawImpl(ui::dxcontext&, ID3D11Texture2D*, RECT, RECT) const override {}
         } stretchAnyTo0x1, stretchAnyTo0x2;
 
-        ui::image<loadTexture> screen{{ 0,   0, 128, 128}, {64,  64, 64,  64}, stretch16To9};
-        ui::image<loadTexture> stripL{{22, 128,  64, 154}, {44, 142, 44, 142}, stretchAnyTo0x1};
-        ui::image<loadTexture> stripR{{64, 128, 106, 154}, {84, 142, 84, 142}, stretchAnyTo0x2};
+        ui::image<loadTexture> screen{{  0,   0, 128, 128}, { 64,  64,  64,  64}, stretch16To9};
+        ui::image<loadTexture> stripL{{ 22, 128,  64, 154}, { 44, 142,  44, 142}, stretchAnyTo0x1};
+        ui::image<loadTexture> stripR{{ 64, 128, 106, 154}, { 84, 142,  84, 142}, stretchAnyTo0x2};
         ui::grid strip{4, 1};
     };
 
@@ -202,7 +201,7 @@ namespace appui {
     // | B -----|-------------------- |    (pretend those letters are icons signifying
     // | M -----|-------------------- |     Brightness, Music, Settings, and Quit)
     // |                      [S] [Q] |
-    // +------------------------------+    TODO static colors
+    // +------------------------------+    TODO static colors, gamma, color offsets, etc.
     struct tooltip_config : ui::grid {
         tooltip_config(double bv, double ba)
             : ui::grid(1, 2)
@@ -237,16 +236,16 @@ namespace appui {
     private:
         padded<ui::grid> brightnessGrid{{10, 0}, 2, 2};
         padded<ui::label> bLabel{{10, 10},
-            std::vector<ui::text_part>{{L"B", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
+            std::vector<ui::text_part>{{L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
         padded<ui::label> mLabel{{10, 10},
-            std::vector<ui::text_part>{{L"M", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
+            std::vector<ui::text_part>{{L"\uf001", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
         padded<ui::slider> bSlider{{10, 10}};
         padded<ui::slider> mSlider{{10, 10}};
 
         padded<ui::grid> bottomRow{{10, 0}, 3, 1};
         padded<ui::label> statusText{{10, 10}};
-        ui::label sLabel{{{L"S", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
-        ui::label qLabel{{{L"Q", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
+        ui::label sLabel{{{L"\uf013", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
+        ui::label qLabel{{{L"\uf011", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
         padded<ui::button> sButton{{10, 10}, sLabel};
         padded<ui::button> qButton{{10, 10}, qLabel};
 
@@ -264,7 +263,7 @@ int ui::main() {
     std::unique_ptr<ui::window> sizingWindow;
     std::unique_ptr<ui::window> tooltipWindow;
     appui::padded<appui::sizing_config> sizingConfig{{20, 20}, 72, 40, 76, 3};
-    appui::padded<appui::tooltip_config> tooltipConfig{{0, 10}, 0.7, 0.4};
+    appui::padded<appui::tooltip_config> tooltipConfig{{10, 20}, 0.7, 0.4};
 
     sizingConfig.onDone.add([&] {
         if (sizingWindow)
