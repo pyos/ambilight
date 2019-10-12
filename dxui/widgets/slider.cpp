@@ -36,8 +36,8 @@ void ui::slider::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT tota
     auto gh = rotate ? ah : gs.bottom - gs.top; // which is why both of these have (bottom - top) cases.
     auto gx = total.left + (rotate ? total.right - total.left - gw : tw) / 2;
     auto gy = total.top  + (rotate ? th : total.bottom - total.top - gh) / 2;
-    auto tx = total.left + (rotate ? aw / 2 : (LONG)(aw * value));
-    auto ty = total.top  + (rotate ? (LONG)(ah * value) : ah / 2);
+    auto tx = total.left + (rotate ? aw / 2 : (LONG)(aw * value_));
+    auto ty = total.top  + (rotate ? (LONG)(ah * value_) : ah / 2);
     if (inverted()) {
         // Transform to the bottom-right corner + a vector towards the left-top corner.
         gx += gw, gy += gh, gw = -gw, gh = -gh;

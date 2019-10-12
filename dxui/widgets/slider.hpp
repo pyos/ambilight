@@ -13,7 +13,7 @@ namespace ui {
         enum orientation { deg0, deg90, deg180, deg270 };
 
         slider(double value = 0., orientation o = deg0)
-            : value(value)
+            : value_(value)
             , currentOrientation(o)
         {}
 
@@ -29,9 +29,14 @@ namespace ui {
             invalidateSize();
         }
 
+        // Get the current value in a range from 0 to 1.
+        double value() const {
+            return value_;
+        }
+
         // Set the current value, clamping if out of bounds. Does not emit the event.
         void setValue(double v) {
-            value = std::min(std::max(v, 0.0), 1.0);
+            value_ = std::min(std::max(v, 0.0), 1.0);
             invalidate();
         }
 
@@ -44,7 +49,7 @@ namespace ui {
         // Map the current value from [0, 1] to an integer range [min, max].
         template <typename T>
         T mapValue(T min, T max, T step = 1) {
-            T r = (T)(value * (max - min) + min + step / 2. /* round to closest */);
+            T r = (T)(value_ * (max - min) + min + step / 2. /* round to closest */);
             return r - r % step;
         }
 
@@ -59,7 +64,7 @@ namespace ui {
             auto [w, h] = measureMin();
             setValue(vertical() ? (relative(abs).y - h / 2.) / (size().y - h)
                                 : (relative(abs).x - w / 2.) / (size().x - w));
-            onChange(value);
+            onChange(value_);
             return keepCapturing;
         }
 
@@ -84,7 +89,7 @@ namespace ui {
         void drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
 
     private:
-        double value;
+        double value_;
         orientation currentOrientation;
         capture_state cap;
     };
