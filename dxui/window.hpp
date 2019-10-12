@@ -57,6 +57,12 @@ namespace ui {
         // handle mouse clicks otherwise.
         void setDragByEmptyAreas(bool value) { dragByEmptyAreas = value; }
 
+        // Create or replace a notification icon in the system tray area.
+        void setNotificationIcon(const ui::icon& icon, util::span<const wchar_t> tip = {});
+
+        // Remove the notification icon.
+        void clearNotificationIcon() { notifyIcon.reset(); }
+
         widget* getRoot() const { return root.get(); }
 
         // Set the root of the widget tree, return the old root.
@@ -101,9 +107,11 @@ namespace ui {
         // Fired when the window is destroyed.
         util::event<> onDestroy;
 
-    private:
-        static void unregister_class(const wchar_t*);
+        // Fired when a notification icon is activated with a left click or a space bar
+        // for the primary action, or a right click or keyboard selection for the secondary.
+        util::event<POINT, bool /* primary */> onNotificationIcon;
 
+    private:
         void onChildRelease(widget& w) override { setRoot(nullptr); }
         void onChildRedraw(widget&, RECT area) override { draw(area); }
         void onChildResize(widget&) override { draw(); }
@@ -112,6 +120,13 @@ namespace ui {
             mouseCapture = &target;
             SetCapture(*this);
         }
+
+        struct release_notify_icon {
+            void operator()(NOTIFYICONDATA* nid) {
+                Shell_NotifyIcon(NIM_DELETE, nid);
+                delete nid;
+            }
+        };
 
     private:
         dxcontext context;
@@ -122,6 +137,7 @@ namespace ui {
         winapi::com_ptr<IDCompositionDevice> device;
         winapi::com_ptr<IDCompositionTarget> target;
         winapi::com_ptr<IDCompositionVisual> visual;
+        std::unique_ptr<NOTIFYICONDATA, release_notify_icon> notifyIcon;
         UINT w = 1, h = 1;
         RECT lastPainted = {0, 0, 0, 0};
         uint32_t background = 0xFFFFFFFFu;

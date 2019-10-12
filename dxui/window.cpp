@@ -68,10 +68,6 @@ static WindowCompositionAttributeFn* GetWindowCompositionAttribute =
 static WindowCompositionAttributeFn* SetWindowCompositionAttribute =
     (WindowCompositionAttributeFn*)GetProcAddress(hUser32, "SetWindowCompositionAttribute");
 
-void ui::window::unregister_class(const wchar_t* name) {
-    UnregisterClass(name, ui::impl::hInstance);
-}
-
 LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
     auto window = reinterpret_cast<ui::window*>(GetWindowLongPtr(handle, GWLP_USERDATA));
     if (window) switch (msg) {
@@ -139,6 +135,17 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
         }
         case WM_NCCALCSIZE:
             return 0;
+        case WM_USER: switch (LOWORD(lParam)) {
+            case NIN_SELECT:
+            case NIN_KEYSELECT:
+                if (!window->onNotificationIcon(POINT{GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam)}, true))
+                    return 0;
+                break;
+            case WM_CONTEXTMENU:
+                if (!window->onNotificationIcon(POINT{GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam)}, false))
+                    return 0;
+                break;
+        }
     }
     return DefWindowProc(handle, msg, wParam, lParam);
 }
@@ -235,6 +242,26 @@ void ui::window::setBackground(uint32_t tint, bool acrylic) {
     ca.pvData = &ap;
     ca.cbData = sizeof(ap);
     winapi::throwOnFalse(SetWindowCompositionAttribute(*this, &ca));
+}
+
+void ui::window::setNotificationIcon(const ui::icon& icon, util::span<const wchar_t> tip) {
+    bool adding = !notifyIcon;
+    if (adding)
+        notifyIcon.reset(new NOTIFYICONDATA{});
+    notifyIcon->cbSize   = sizeof(NOTIFYICONDATA);
+    notifyIcon->hWnd     = *this;
+    notifyIcon->hIcon    = icon.get();
+    notifyIcon->uFlags   = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP;
+    notifyIcon->uTimeout = 0;
+    notifyIcon->uCallbackMessage = WM_USER;
+    memset(notifyIcon->szTip, 0, sizeof(notifyIcon->szTip));
+    if (tip)
+        memcpy(notifyIcon->szTip, tip.data(), std::min(tip.size(), ARRAYSIZE(notifyIcon->szTip)) * sizeof(wchar_t));
+    winapi::throwOnFalse(Shell_NotifyIcon(adding ? NIM_ADD : NIM_MODIFY, notifyIcon.get()));
+    if (adding) {
+        notifyIcon->uVersion = NOTIFYICON_VERSION_4;
+        winapi::throwOnFalse(Shell_NotifyIcon(NIM_SETVERSION, notifyIcon.get()));
+    }
 }
 
 void ui::window::onMouse(POINT abs, int keys) {
