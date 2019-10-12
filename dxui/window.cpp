@@ -68,6 +68,15 @@ static WindowCompositionAttributeFn* GetWindowCompositionAttribute =
 static WindowCompositionAttributeFn* SetWindowCompositionAttribute =
     (WindowCompositionAttributeFn*)GetProcAddress(hUser32, "SetWindowCompositionAttribute");
 
+static void applyGravity(ui::window::gravity g, LONG& a, LONG& b, LONG& d) {
+    switch (g) {
+        default:
+        case ui::window::gravity_start:  b = a + d; break;
+        case ui::window::gravity_center: a = (a + b - d) / 2; b = (a + b + d) / 2;
+        case ui::window::gravity_end:    a = b - d; break;
+    }
+}
+
 LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
     auto window = reinterpret_cast<ui::window*>(GetWindowLongPtr(handle, GWLP_USERDATA));
     if (window) switch (msg) {
@@ -96,18 +105,10 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
             if (auto root = window->getRoot()) {
                 auto r = reinterpret_cast<RECT*>(lParam);
                 auto [w, h] = root->measure({r->right - r->left, r->bottom - r->top});
-                if (w != r->right - r->left) switch (wParam) {
-                    case WMSZ_BOTTOMLEFT:
-                    case WMSZ_TOPLEFT:
-                    case WMSZ_LEFT: r->left = r->right - w; break;
-                    default: r->right = r->left + w; break;
-                }
-                if (h != r->bottom - r->top) switch (wParam) {
-                    case WMSZ_TOPRIGHT:
-                    case WMSZ_TOPLEFT:
-                    case WMSZ_TOP: r->top = r->bottom - h; break;
-                    default: r->bottom = r->top + h; break;
-                }
+                auto left = wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_TOPLEFT || wParam == WMSZ_LEFT;
+                auto top  = wParam == WMSZ_TOPRIGHT   || wParam == WMSZ_TOPLEFT || wParam == WMSZ_TOP;
+                applyGravity(left ? ui::window::gravity_end : ui::window::gravity_start, r->left, r->right, w);
+                applyGravity(top  ? ui::window::gravity_end : ui::window::gravity_start, r->top, r->bottom, w);
             }
             break;
         case WM_ACTIVATE:
@@ -158,12 +159,8 @@ ui::window::window(int w, int h, int x, int y, window* parent) {
     SetWindowLongPtr(*this, GWLP_USERDATA, (LONG_PTR)this);
     MARGINS m = {1, 1, 1, 1};
     DwmExtendFrameIntoClientArea(*this, &m);
-    // Windows will not give us a WM_NCCALCSIZE until the window gets resized,
-    // so do that preemptively.
-    RECT rect;
-    GetWindowRect(*this, &rect);
-    rect.right += 1; move(rect);
-    rect.right -= 1; move(rect);
+    // Request a WM_NCCALCSIZE so that Windows knows we don't want a frame.
+    SetWindowPos(*this, HWND_NOTOPMOST, 0, 0, w, h, SWP_DRAWFRAME|SWP_NOMOVE);
 
     auto dxgiDevice = COMi(IDXGIDevice, context.raw()->QueryInterface);
     auto dxgiAdapter = COMi(IDXGIAdapter, dxgiDevice->GetParent);
@@ -196,16 +193,18 @@ void ui::window::drawImmediate(RECT scheduled) {
     RECT rect;
     GetWindowRect(*this, &rect);
     if (root) {
-        POINT c = {rect.right - rect.left, rect.bottom - rect.top};
-        POINT w = root->measure(c);
-        if (w.x != c.x || w.y != c.y) {
-            rect.right = rect.left + w.x;
-            rect.bottom = rect.top + w.y;
+        // Fit the window size to contents.
+        POINT actualSize = {rect.right - rect.left, rect.bottom - rect.top};
+        POINT neededSize = root->measure(actualSize);
+        if (neededSize.x != actualSize.x || neededSize.y != actualSize.y) {
+            applyGravity(hGravity, rect.left, rect.right, neededSize.x);
+            applyGravity(vGravity, rect.top, rect.bottom, neededSize.y);
             move(rect);
         }
     }
 
     if (w != rect.right - rect.left || h != rect.bottom - rect.top) {
+        // Fit the swapchain buffer to window size.
         w = std::max(rect.right - rect.left, 1L);
         h = std::max(rect.bottom - rect.top, 1L);
         DXGI_SWAP_CHAIN_DESC swapChainDesc;
@@ -215,9 +214,11 @@ void ui::window::drawImmediate(RECT scheduled) {
     }
 
     auto target = COMv(ID3D11Texture2D, swapChain->GetBuffer, 0);
-    // We're in flip mode, so the current back buffer contains outdated state.
-    // TODO don't draw the intersection twice at all
     if (!isSubRect(lastPainted, scheduled)) {
+        // We're in flip mode, so the current back buffer contains outdated state,
+        // which we also need to repaint.
+        //
+        // TODO copy from the other buffer directly somehow
         context.clear(target, lastPainted, background);
         if (root) root->draw(context, target, {0, 0, (LONG)w, (LONG)h}, lastPainted);
     }

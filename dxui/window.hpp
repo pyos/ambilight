@@ -20,6 +20,12 @@ namespace ui {
     // NOTE: the window is initially hidden.
     //
     struct window : private widget_parent {
+        // Where the size of the content changes, extend or shrink the area
+        //    gravity_start     downward and rightward
+        //    gravity_center    uniformly in all directions
+        //    gravity_end       upward and leftward
+        enum gravity { gravity_start, gravity_center, gravity_end };
+
         window(int w, int h, int x = CW_USEDEFAULT, int y = CW_USEDEFAULT, window* parent = nullptr);
 
         // Cast this window to a raw WinAPI handle.
@@ -56,6 +62,9 @@ namespace ui {
 
         // Whether this window is maximized, duh.
         bool isMaximized() { return IsZoomed(*this); }
+
+        // Set the direction in which the window will change size to accomodate the root widget.
+        void setGravity(gravity h, gravity v) { hGravity = h, vGravity = v; }
 
         // Set the background of the window, in ARGB format. Default is white.
         // Transparent colors use the Windows 10 blur effect.
@@ -146,7 +155,10 @@ namespace ui {
         winapi::com_ptr<IDCompositionTarget> target;
         winapi::com_ptr<IDCompositionVisual> visual;
         std::unique_ptr<NOTIFYICONDATA, release_notify_icon> notifyIcon;
-        UINT w = 1, h = 1;
+        gravity hGravity = gravity_start;
+        gravity vGravity = gravity_start;
+        UINT w = 1;
+        UINT h = 1;
         RECT lastPainted = {0, 0, 0, 0};
         uint32_t background = 0xFFFFFFFFu;
         bool mouseInBounds = false;

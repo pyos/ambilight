@@ -301,11 +301,13 @@ int ui::main() {
     }).release();
 
     mainWindow.onNotificationIcon.add([&](POINT p, bool primary) {
-        POINT size = {500, tooltipConfig.measureMin().y};
+        ui::window::gravity hGravity = ui::window::gravity_start;
+        ui::window::gravity vGravity = ui::window::gravity_start;
+        POINT size = tooltipConfig.measure({500, 0});
+        // Put the window into the corner nearest to the notification tray.
         MONITORINFO monitor = {};
         monitor.cbSize = sizeof(monitor);
         if (GetMonitorInfo(MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST), &monitor)) {
-            // Put the window into the corner nearest to the notification tray.
             POINT corners[4] = {
                 {monitor.rcWork.left, monitor.rcWork.top},
                 {monitor.rcWork.right, monitor.rcWork.top},
@@ -314,15 +316,18 @@ int ui::main() {
             };
             auto sqdistance = [](POINT a, POINT b) {
                 return (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y); };
-            POINT nearest = *std::min_element(std::begin(corners), std::end(corners),
+            p = *std::min_element(std::begin(corners), std::end(corners),
                 [&](POINT a, POINT b) { return sqdistance(p, a) < sqdistance(p, b); });
-            p = {std::min(monitor.rcWork.right - size.x, std::max(monitor.rcWork.left, nearest.x)),
-                 std::min(monitor.rcWork.bottom - size.y, std::max(monitor.rcWork.top, nearest.y))};
+            hGravity = p.x == monitor.rcWork.left ? ui::window::gravity_start : ui::window::gravity_end;
+            vGravity = p.y == monitor.rcWork.top  ? ui::window::gravity_start : ui::window::gravity_end;
         }
+        if (hGravity == ui::window::gravity_end) p.x -= size.x;
+        if (vGravity == ui::window::gravity_end) p.y -= size.y;
         tooltipWindow = std::make_unique<ui::window>(size.x, size.y, p.x, p.y, &mainWindow);
         tooltipWindow->onBlur.add([&] { tooltipWindow->close(); }).release();
         tooltipWindow->setBackground(0xa0000000u, true);
         tooltipWindow->setDragByEmptyAreas(false);
+        tooltipWindow->setGravity(hGravity, vGravity);
         tooltipWindow->setRoot(&tooltipConfig);
         tooltipWindow->setTopmost(true);
         tooltipWindow->show();
