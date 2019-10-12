@@ -60,7 +60,7 @@ POINT ui::label::measureImpl(POINT fit) const {
 }
 
 void ui::label::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
-    measureMin(); // Make sure the origin X and the character count are set to the correct values.
+    measureMin(); // Make sure the origin X is set to the correct value.
     std::vector<ui::vertex> quads;
     if (!data.empty())
         quads.reserve(std::max_element(data.begin(), data.end(), [](auto& a, auto& b) {
