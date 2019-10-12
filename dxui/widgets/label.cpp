@@ -40,30 +40,24 @@ POINT ui::label::measureMinImpl() const {
 }
 
 POINT ui::label::measureImpl(POINT fit) const {
-    double tx = 0, ty = 0;
-    double sx = 0, ex = 0;
+    double tx = 0, ty = 0, sx = 0;
     split<const ui::text_part>(data, [](auto& c) { return c.breakAfter; }, 0, [&](size_t, util::span<const ui::text_part> parts) {
-        bool firstInLine = true;
-        double lx = 0, ly = 0;
+        double lx = 0, ly = 0, ex = 0;
         for (const ui::text_part& part : parts) {
-            if (part.data) {
-                double scale = (double)part.fontSize / part.font.get().nativeSize();
-                for (wchar_t c : part.data)
-                    lx += part.font.get()[c].advance * scale;
-                auto& last = part.font.get()[part.data[part.data.size() - 1]];
-                // Horizontally align lines so that there is a straight vertical line
-                // going through the origins of the first character of each.
-                sx = std::max(sx, scale * part.font.get()[part.data[0]].originX * firstInLine);
-                // Reserve some space for the last character's right edge.
-                ex = scale * (last.w - last.advance - last.originX);
-                firstInLine = false;
+            double scale = (double)part.fontSize / part.font.get().nativeSize();
+            for (wchar_t c : part.data) {
+                auto& sym = part.font.get()[c];
+                lx += sym.advance * scale;
+                // Reserve some space for the character's edges.
+                sx = std::min(sx, lx - scale * (sym.originX + sym.advance));
+                ex = std::max(ex, lx + scale * (sym.w - sym.advance - sym.originX));
             }
             ly = std::max(ly, part.fontSize * lineHeight);
         }
-        tx = std::max(lx + ex, tx), ty += ly;
+        tx = std::max(ex, tx), ty += ly;
     });
-    originX = sx;
-    return {hideOverflow ? std::min((LONG)(sx + tx) + 1, fit.x) : (LONG)(sx + tx) + 1, (LONG)ty + 1};
+    originX = -sx;
+    return {hideOverflow ? std::min((LONG)(tx - sx) + 1, fit.x) : (LONG)(tx - sx) + 1, (LONG)ty + 1};
 }
 
 void ui::label::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
@@ -79,7 +73,7 @@ void ui::label::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total
         double bs = 0;
         for (const ui::text_part& part : parts) {
             ly = std::max(ly, part.fontSize * lineHeight);
-            bs = std::max(bs, part.fontSize * part.font.get().baseline() / (double)part.font.get().nativeSize());
+            bs = std::max(bs, part.fontSize * lineHeight * part.font.get().baseline() / (double)part.font.get().nativeSize());
         }
         ty += ly;
         double x = originX;
