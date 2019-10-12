@@ -42,12 +42,12 @@ namespace ui {
             invalidateSize();
         }
 
-        void setColStretch(size_t x /* < cols */, uint32_t w) {
+        void setColStretch(size_t x /* < cols */, uint16_t w) {
             cols[x].weight = w;
             invalidateSize();
         }
 
-        void setRowStretch(size_t y /* < rows */, uint32_t w) {
+        void setRowStretch(size_t y /* < rows */, uint16_t w) {
             rows[y].weight = w;
             invalidateSize();
         }
@@ -74,8 +74,8 @@ namespace ui {
             mutable LONG start;
             mutable LONG size;
             mutable LONG min;
-            mutable uint32_t stretch;
-            uint32_t weight = 0;
+            mutable uint16_t stretch;
+            uint16_t weight = 0;
         };
 
         RECT itemRect(size_t x, size_t y, size_t i, POINT origin = {0, 0}) const;

@@ -134,7 +134,7 @@ namespace ui {
         winapi::com_ptr<ID3D11Buffer> buffer(util::span<const uint8_t> contents, int bindFlags) {
             D3D11_BUFFER_DESC bufferDesc = {};
             bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-            bufferDesc.ByteWidth = contents.size();
+            bufferDesc.ByteWidth = (UINT)contents.size();
             bufferDesc.BindFlags = bindFlags;
             D3D11_SUBRESOURCE_DATA initData = {contents.data(), 0, 0};
             return COMe(ID3D11Buffer, device->CreateBuffer, &bufferDesc, &initData);

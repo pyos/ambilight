@@ -126,7 +126,7 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
         case WM_MBUTTONDOWN:
         case WM_XBUTTONUP:
         case WM_XBUTTONDOWN:
-            window->onMouse(POINT{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)}, wParam);
+            window->onMouse(POINT{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)}, (int)wParam);
             break;
         case WM_MOUSELEAVE:
             window->onMouseLeave();

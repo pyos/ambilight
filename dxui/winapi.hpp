@@ -50,12 +50,12 @@ namespace winapi {
         // Ambiguous whether the pointer is managed or not. D3D initializers use `operator&` anyway.
         com_ptr(T*) = delete;
         com_ptr(com_ptr&&) = default;
-        com_ptr(const com_ptr& p) : unique_ptr<T, com_release>(p.get()) { if (p) p->AddRef(); }
+        com_ptr(const com_ptr& p) : std::unique_ptr<T, com_release>(p.get()) { if (p) p->AddRef(); }
         com_ptr& operator=(com_ptr&&) = default;
         com_ptr& operator=(const com_ptr& p) { return *this = com_ptr<T>(p); }
 
         operator T*() const {
-            return get();
+            return std::unique_ptr<T, com_release>::get();
         }
 
         T** operator&() {

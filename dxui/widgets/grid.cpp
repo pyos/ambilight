@@ -36,7 +36,7 @@ POINT ui::grid::measureMinImpl() const {
 
 POINT ui::grid::measureImpl(POINT fit) const {
     auto allocateRemaining = [this](const std::vector<group>& m, LONG space) {
-        uint64_t total = 0;
+        LONG total = 0;
         for (auto& it : m) {
             if ((it.stretch = it.weight))
                 total += it.stretch;
@@ -46,7 +46,7 @@ POINT ui::grid::measureImpl(POINT fit) const {
         for (bool changed = true; changed; ) {
             changed = false;
             for (auto& it : m) {
-                if (it.stretch && (it.size = space < 0 ? 0 : space * it.stretch / total) < it.min) {
+                if (it.stretch && (space < 0 || (it.size = space * it.stretch / total) < it.min)) {
                     total -= it.stretch;
                     space -= it.size = it.min;
                     it.stretch = 0;

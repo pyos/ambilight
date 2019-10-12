@@ -29,7 +29,7 @@ int ui::dispatch() {
     while (true) {
         winapi::throwOnFalse(GetMessage(&msg, nullptr, 0, 0) >= 0);
         if (msg.message == WM_QUIT)
-            return msg.wParam;
+            return (int)msg.wParam;
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
