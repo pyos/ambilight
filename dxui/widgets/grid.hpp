@@ -79,9 +79,9 @@ namespace ui {
         };
 
         RECT itemRect(size_t x, size_t y, size_t i, POINT origin = {0, 0}) const;
-        POINT measureMinEx() const override;
-        POINT measureEx(POINT fit) const override;
-        void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
+        POINT measureMinImpl() const override;
+        POINT measureImpl(POINT fit) const override;
+        void drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
         bool onMouse(POINT p, int keys) override;
         void onMouseLeave() override;
 

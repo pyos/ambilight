@@ -32,7 +32,7 @@ namespace ui {
         // smaller than this is given to `draw`, the widget is clipped.
         POINT measureMin() const {
             if (lastMeasureMin.x < 0 && lastMeasureMin.y < 0)
-                lastMeasureMin = measureMinEx();
+                lastMeasureMin = measureMinImpl();
             return lastMeasureMin;
         }
 
@@ -43,7 +43,7 @@ namespace ui {
             POINT min = measureMin();
             POINT rnd = {std::max(fit.x, min.x), std::max(fit.y, min.y)};
             if (lastMeasureArg.x != rnd.x || lastMeasureArg.y != rnd.y) {
-                lastMeasureRes = measureEx(rnd);
+                lastMeasureRes = measureImpl(rnd);
                 lastMeasureArg = rnd;
             }
             return lastMeasureRes;
@@ -60,7 +60,7 @@ namespace ui {
         //          in the seemingly empty space around it. So don't do that.
         //
         void draw(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
-            drawEx(ctx, target, lastDrawRect = total, dirty);
+            drawImpl(ctx, target, lastDrawRect = total, dirty);
         }
 
         void setParent(widget_parent* p) {
@@ -87,9 +87,9 @@ namespace ui {
         virtual void onMouseLeave() { }
 
     protected:
-        virtual POINT measureMinEx() const = 0;
-        virtual POINT measureEx(POINT) const { return measureMin(); }
-        virtual void drawEx(ui::dxcontext&, ID3D11Texture2D*, RECT total, RECT dirty) const { }
+        virtual POINT measureMinImpl() const = 0;
+        virtual POINT measureImpl(POINT) const { return measureMin(); }
+        virtual void drawImpl(ui::dxcontext&, ID3D11Texture2D*, RECT total, RECT dirty) const { }
 
         // Mark the contents of this widget as updated.
         void invalidate() {

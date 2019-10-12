@@ -18,7 +18,7 @@ RECT ui::grid::itemRect(size_t x, size_t y, size_t i, POINT origin) const {
     return {origin.x, origin.y, origin.x + w, origin.y + h};
 }
 
-POINT ui::grid::measureMinEx() const {
+POINT ui::grid::measureMinImpl() const {
     for (auto& c : cols) c.min = 0;
     for (auto& r : rows) r.min = 0;
     for (size_t x = 0, i = 0; x < cols.size(); x++) {
@@ -34,7 +34,7 @@ POINT ui::grid::measureMinEx() const {
     return res;
 }
 
-POINT ui::grid::measureEx(POINT fit) const {
+POINT ui::grid::measureImpl(POINT fit) const {
     auto allocateRemaining = [this](const std::vector<group>& m, LONG space) {
         uint64_t total = 0;
         for (auto& it : m) {
@@ -74,7 +74,7 @@ POINT ui::grid::measureEx(POINT fit) const {
     return {cols.back().start + cols.back().size, rows.back().start + rows.back().size};
 }
 
-void ui::grid::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
+void ui::grid::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
     // Fill `c` and `r` with the correct values for `start` and `end`.
     measure({total.right - total.left, total.bottom - total.top});
     for (size_t x = 0, i = 0; x < cols.size(); x++) {

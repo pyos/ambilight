@@ -74,9 +74,9 @@ namespace ui {
     private:
         bool vertical() const { return currentOrientation == deg90  || currentOrientation == deg270; }
         bool inverted() const { return currentOrientation == deg180 || currentOrientation == deg270; }
-        POINT measureMinEx() const override;
-        POINT measureEx(POINT fit) const override;
-        void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
+        POINT measureMinImpl() const override;
+        POINT measureImpl(POINT fit) const override;
+        void drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
 
     private:
         double value;

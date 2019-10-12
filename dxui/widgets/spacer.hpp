@@ -48,17 +48,17 @@ namespace ui {
         }
 
     private:
-        POINT measureMinEx() const override {
+        POINT measureMinImpl() const override {
             auto [w, h] = child ? child->measureMin() : POINT{0, 0};
             return {w + size_.x, h + size_.y};
         }
 
-        POINT measureEx(POINT fit) const override {
+        POINT measureImpl(POINT fit) const override {
             auto [w, h] = child ? child->measure({fit.x - size_.x, fit.y - size_.y}) : POINT{0, 0};
             return {w + size_.x, h + size_.y};
         }
 
-        void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override {
+        void drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override {
             if (child) {
                 POINT h = {size_.x / 2, size_.y / 2};
                 RECT r = {total.left + h.x, total.top + h.y,

@@ -28,11 +28,11 @@ const ui::font_symbol& ui::font::operator[](wchar_t point) const {
     return point < 256 ? ascii[point] : empty;
 }
 
-POINT ui::label::measureMinEx() const {
-    return measureEx({0, 0});
+POINT ui::label::measureMinImpl() const {
+    return measureImpl({0, 0});
 }
 
-POINT ui::label::measureEx(POINT fit) const {
+POINT ui::label::measureImpl(POINT fit) const {
     double tx = 0, ty = 0;
     double sx = 0, ex = 0;
     split<const ui::text_part>(data, [](auto& c) { return c.breakAfter; }, 0, [&](size_t, util::span<const ui::text_part> parts) {
@@ -59,7 +59,7 @@ POINT ui::label::measureEx(POINT fit) const {
     return {hideOverflow ? std::min((LONG)(sx + tx) + 1, fit.x) : (LONG)(sx + tx) + 1, (LONG)ty + 1};
 }
 
-void ui::label::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
+void ui::label::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
     measureMin(); // Make sure the origin X and the character count are set to the correct values.
     std::vector<ui::vertex> quads;
     if (!data.empty())

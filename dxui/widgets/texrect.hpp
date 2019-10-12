@@ -39,19 +39,19 @@ namespace ui {
             return {i.left - o.left, i.top - o.top, o.right - i.right, o.bottom - i.bottom};
         }
 
-        POINT measureMinEx() const {
+        POINT measureMinImpl() const {
             auto [pl, pt, pr, pb] = getPadding();
             auto [w, h] = contents ? contents->measureMin() : POINT{0, 0};
             return {w + pl + pr, h + pt + pb};
         }
 
-        POINT measureEx(POINT fit) const {
+        POINT measureImpl(POINT fit) const {
             auto [pl, pt, pr, pb] = getPadding();
             auto [w, h] = contents ? contents->measure({fit.x - pl - pr, fit.y - pt - pb}) : POINT{0, 0};
             return {w + pl + pr, h + pt + pb};
         }
 
-        void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
+        void drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
 
     protected:
         virtual winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const = 0;

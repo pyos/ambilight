@@ -97,9 +97,9 @@ namespace ui {
         }
 
     private:
-        POINT measureMinEx() const override;
-        POINT measureEx(POINT) const override;
-        void drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
+        POINT measureMinImpl() const override;
+        POINT measureImpl(POINT) const override;
+        void drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
 
     private:
         std::vector<text_part> data;

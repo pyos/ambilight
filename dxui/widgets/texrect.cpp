@@ -1,6 +1,6 @@
 #include "texrect.hpp"
 
-void ui::texrect::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
+void ui::texrect::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
     auto [ol, ot, or, ob] = getOuter();
     auto [il, it, ir, ib] = getInner();
     auto pl = il - ol, pt = it - ot, pr = or - ir, pb = ob - ib;

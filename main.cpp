@@ -119,10 +119,10 @@ namespace appui {
             return ctx.textureFromPNG(ui::read(ui::fromBundled(IDI_SCREENSETUP), L"PNG")); }
 
         struct fixedAspectRatio : ui::widget {
-            POINT measureMinEx() const override { return {60, 1}; }
-            POINT measureEx(POINT fit) const override {
+            POINT measureMinImpl() const override { return {60, 1}; }
+            POINT measureImpl(POINT fit) const override {
                 return {std::min(fit.x, fit.y * 16 / 9 + 60), std::min(fit.x * 9 / 16 - 33, fit.y)}; }
-            void drawEx(ui::dxcontext&, ID3D11Texture2D*, RECT, RECT) const override {}
+            void drawImpl(ui::dxcontext&, ID3D11Texture2D*, RECT, RECT) const override {}
         } stretch16To9;
 
         struct screen : ui::texrect {
@@ -134,9 +134,9 @@ namespace appui {
         } screen{stretch16To9};
 
         struct hstretch : ui::widget  {
-            POINT measureMinEx() const override { return {0, 0}; }
-            POINT measureEx(POINT fit) const override { return {fit.x, 0}; }
-            void drawEx(ui::dxcontext&, ID3D11Texture2D*, RECT, RECT) const override {}
+            POINT measureMinImpl() const override { return {0, 0}; }
+            POINT measureImpl(POINT fit) const override { return {fit.x, 0}; }
+            void drawImpl(ui::dxcontext&, ID3D11Texture2D*, RECT, RECT) const override {}
         } stretchAnyTo0x1, stretchAnyTo0x2;
 
         struct stripLeft : screen {

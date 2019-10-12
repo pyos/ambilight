@@ -1,19 +1,19 @@
 #include "slider.hpp"
 #include "data.hpp"
 
-POINT ui::slider::measureMinEx() const {
+POINT ui::slider::measureMinImpl() const {
     auto ts = builtinRect(SLIDER_TRACK);
     return {vertical() ? ts.bottom - ts.top : ts.right - ts.left,
             vertical() ? ts.right - ts.left : ts.bottom - ts.top};
 }
 
-POINT ui::slider::measureEx(POINT fit) const {
+POINT ui::slider::measureImpl(POINT fit) const {
     auto ts = builtinRect(SLIDER_TRACK);
     return {vertical() ? ts.bottom - ts.top : fit.x,
             vertical() ? fit.y : ts.bottom - ts.top};
 }
 
-void ui::slider::drawEx(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
+void ui::slider::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
     auto gs = builtinRect(SLIDER_GROOVE);
     auto ts = builtinRect(SLIDER_TRACK);
     auto [tw, th] = measureMin();            // Horizontal:          Vertical:
