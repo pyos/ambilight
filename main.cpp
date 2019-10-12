@@ -475,7 +475,7 @@ int ui::main() {
     std::mutex mut;
     std::condition_variable frameEv;
     bool frameDirty = false;
-    UINT frameData[4][AMBILIGHT_CHUNKS_PER_STRIP * AMBILIGHT_SERIAL_CHUNK];
+    UINT frameData[4][AMBILIGHT_CHUNKS_PER_STRIP * AMBILIGHT_SERIAL_CHUNK] = {};
 
     auto updateLocked = [&](auto&& unsafePart) {
         std::lock_guard<std::mutex> lock(mut);
@@ -501,31 +501,32 @@ int ui::main() {
         });
     };
 
-/*
+    std::atomic<uint32_t> averageColor = fake.color;
     auto captureVideo = loopThread([&](std::atomic<bool>& terminate) {
-        auto cap = captureScreen(0, AMBILIGHT_WIDTH, AMBILIGHT_HEIGHT);
+        size_t w = fake.width;
+        size_t h = fake.height;
+        auto cap = captureScreen(0, w, h);
+        std::vector<UINT> data((w + h) * 2);
         while (!terminate) if (auto in = cap->next()) {
             UINT averageComponents[4] = {0, 0, 0, 0};
             for (const auto& color : in.reinterpret<const BYTE[4]>())
                 for (UINT c = 0; c < 4; c++)
                     averageComponents[c] += color[c];
             averageColor = 0xFF000000u
-                        | (averageComponents[2] / AMBILIGHT_WIDTH / AMBILIGHT_HEIGHT) << 16
-                        | (averageComponents[1] / AMBILIGHT_WIDTH / AMBILIGHT_HEIGHT) << 8
-                        | (averageComponents[0] / AMBILIGHT_WIDTH / AMBILIGHT_HEIGHT);
-            UINT data[AMBILIGHT_VIDEO_LEDS];
-            auto out = data;
-#define W_PX(y, x) do { *out++ = in[(y) * AMBILIGHT_WIDTH + (x)]; } while (0)
+                        | (averageComponents[2] / w / h) << 16
+                        | (averageComponents[1] / w / h) << 8
+                        | (averageComponents[0] / w / h);
+            auto out = data.data();
+#define W_PX(y, x) do { *out++ = in[(y) * w + (x)]; } while (0)
             // bottom right -> bottom left -> top left; bottom right -> top right -> top left
-            for (UINT x = AMBILIGHT_WIDTH;  x--; ) W_PX(AMBILIGHT_HEIGHT - 1, x);
-            for (UINT y = AMBILIGHT_HEIGHT; y--; ) W_PX(y, 0);
-            for (UINT y = AMBILIGHT_HEIGHT; y--; ) W_PX(y, AMBILIGHT_WIDTH - 1);
-            for (UINT x = AMBILIGHT_WIDTH;  x--; ) W_PX(0, x);
+            for (UINT x = w; x--; ) W_PX(h - 1, x);
+            for (UINT y = h; y--; ) W_PX(y, 0);
+            for (UINT y = h; y--; ) W_PX(y, h - 1);
+            for (UINT x = w; x--; ) W_PX(0, x);
 #undef W_PX
-            updateRange(0, AMBILIGHT_VIDEO_LEDS, data);
+            updateFrom(data.data(), data.data() + w + h, nullptr, nullptr, w, h, 0);
         }
     });
-*/
 
 // Coefficients for ensuring uniformity of the spectrum. Each octave's power
 // is divided by e^(Mx) / N, where x = the index of that octave from the end.
@@ -543,8 +544,7 @@ int ui::main() {
             // 2. When value is 0, both hue and saturation become undefined (all colors are black),
             //    causing an abrupt switch to white at the end of a fade to black. Keep the old
             //    hue/saturation when any value is OK to avoid that.
-            // TODO average screen color
-            auto [a, h, s, v] = argb2ahsv(u2qd(fake.color));
+            auto [a, h, s, v] = argb2ahsv(u2qd(averageColor));
             auto [_, r, g, b] = ahsv2argb({1, (h = lastH = s ? h : lastH), (s = lastS = v ? s : lastS), std::max(v, 0.5)});
             UINT delta = qd2u({0, r * 2 / in.size(), g * 2 / in.size(), b * 2 / in.size()});
             size_t i = 0, j = 0;
@@ -606,11 +606,27 @@ int ui::main() {
         });
     };
 
+    auto setVideoPattern = [&] {
+        uint32_t c = fake.color;
+        if (c & 0xFF000000) {
+            videoCaptureThread.reset();
+            averageColor = c;
+            updateLocked([&] {
+                size_t s = fake.width + fake.height;
+                std::fill(frameData[0], frameData[0] + s, c);
+                std::fill(frameData[1], frameData[1] + s, c);
+                return true;
+            });
+        } else if (!videoCaptureThread) {
+            videoCaptureThread.emplace(captureVideo);
+        }
+    };
+
     sizingConfig.onDone.add([&] {
         if (sizingWindow)
             sizingWindow->close();
         mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
-        // TODO start video capture / set video color
+        setVideoPattern();
         audioCaptureThread.emplace(captureAudio);
     }).release();
     sizingConfig.onChange.add([&](int i, size_t value) {
@@ -628,7 +644,7 @@ int ui::main() {
         }
     }).release();
 
-    tooltipConfig.setStatusMessage(L"Serial port offline");
+    //tooltipConfig.setStatusMessage(L"Serial port offline");
     tooltipConfig.onQuit.add([&] { mainWindow.close(); }).release();
     tooltipConfig.onSettings.add([&] {
         mainWindow.clearNotificationIcon();
@@ -660,23 +676,7 @@ int ui::main() {
     }).release();
     tooltipConfig.onColor.add([&](uint32_t c) {
         fake.color = c;
-        if (c & 0xFF000000) {
-            videoCaptureThread.reset();
-            updateLocked([&] {
-                size_t s = fake.width + fake.height;
-                std::fill(frameData[0], frameData[0] + s, c);
-                std::fill(frameData[1], frameData[1] + s, c);
-                return true;
-            });
-        } else {
-            // TODO enable the video capture thread instead
-            updateLocked([&] {
-                size_t s = fake.width + fake.height;
-                std::fill(frameData[0], frameData[0] + s, c);
-                std::fill(frameData[1], frameData[1] + s, c);
-                return true;
-            });
-        }
+        setVideoPattern();
     }).release();
 
     mainWindow.onNotificationIcon.add([&](POINT p, bool primary) {

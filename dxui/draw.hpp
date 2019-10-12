@@ -107,16 +107,20 @@ namespace ui {
         // Clear a region of a texture, setting all pixels in it to the specified ARGB color.
         void clear(ID3D11Texture2D* target, RECT, uint32_t color = 0);
 
+        enum mode { normal, distanceCoded, blurH, blurV };
+
         // Draw a textured object onto a surface. Vertex coordinates must be given in pixels;
         // calling this function will transform them into UV.
         void draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util::span<vertex> vertices, RECT cull,
-                  bool distanceCoded = false);
+                  mode mode = normal);
 
         // Convert raw BGRA data into a texture. Size must be a multiple of `4w`.
         winapi::com_ptr<ID3D11Texture2D> textureFromRaw(util::span<const uint8_t>, size_t w, bool mipmaps = false);
 
         // Convert a PNG image into a BGRA 32-bit texture.
         winapi::com_ptr<ID3D11Texture2D> textureFromPNG(util::span<const uint8_t>, bool mipmaps = false);
+
+        void regenerateMipMaps(ID3D11Texture2D* texture);
 
         template <typename F /* = winapi::com_ptr<ID3D11Texture2D>() */>
         winapi::com_ptr<ID3D11Texture2D> cachedTexture(uintptr_t key, F&& gen) {
@@ -149,6 +153,8 @@ namespace ui {
         winapi::com_ptr<ID3D11VertexShader> vertexId;
         winapi::com_ptr<ID3D11PixelShader> pixelId;
         winapi::com_ptr<ID3D11PixelShader> colorDistance;
+        winapi::com_ptr<ID3D11PixelShader> blurX;
+        winapi::com_ptr<ID3D11PixelShader> blurY;
         winapi::com_ptr<ID3D11InputLayout> inputLayout;
         winapi::com_ptr<ID3D11SamplerState> linear;
         winapi::com_ptr<ID3D11BlendState> blendOver;

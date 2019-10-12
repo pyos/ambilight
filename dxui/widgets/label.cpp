@@ -93,7 +93,7 @@ void ui::label::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total
             }
             for (auto& vertex : quads)
                 vertex.clr = ARGB2CLR(part.fontColor);
-            ctx.draw(target, part.font.get().loadTexture(ctx), quads, dirty, true);
+            ctx.draw(target, part.font.get().loadTexture(ctx), quads, dirty, ui::dxcontext::distanceCoded);
         }
     });
 }

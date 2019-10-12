@@ -10,6 +10,8 @@
 #include <dxui/shaders/id_vertex.h>
 #include <dxui/shaders/id_pixel.h>
 #include <dxui/shaders/distance_color.h>
+#include <dxui/shaders/blurX.h>
+#include <dxui/shaders/blurY.h>
 
 ui::dxcontext::dxcontext() {
     D3D_FEATURE_LEVEL level;
@@ -36,6 +38,8 @@ ui::dxcontext::dxcontext() {
     vertexId = COMe(ID3D11VertexShader, device->CreateVertexShader, g_id_vertex, ARRAYSIZE(g_id_vertex), nullptr);
     pixelId = COMe(ID3D11PixelShader, device->CreatePixelShader, g_id_pixel, ARRAYSIZE(g_id_pixel), nullptr);
     colorDistance = COMe(ID3D11PixelShader, device->CreatePixelShader, g_distance_color, ARRAYSIZE(g_distance_color), nullptr);
+    blurX = COMe(ID3D11PixelShader, device->CreatePixelShader, g_blurX, ARRAYSIZE(g_blurX), nullptr);
+    blurY = COMe(ID3D11PixelShader, device->CreatePixelShader, g_blurY, ARRAYSIZE(g_blurY), nullptr);
     inputLayout = COMe(ID3D11InputLayout, device->CreateInputLayout, layout, ARRAYSIZE(layout), g_id_vertex, ARRAYSIZE(g_id_vertex));
     context->IASetInputLayout(inputLayout);
 
@@ -79,7 +83,6 @@ ui::dxcontext::dxcontext() {
     context->VSSetShader(vertexId, nullptr, 0);
     context->PSSetSamplers(0, 1, &linear);
     context->RSSetState(rState);
-
 }
 
 void ui::dxcontext::clear(ID3D11Texture2D* target, RECT area, uint32_t color) {
@@ -104,8 +107,12 @@ void ui::dxcontext::clear(ID3D11Texture2D* target, RECT area, uint32_t color) {
     context->Draw(6, 0);
 }
 
+void ui::dxcontext::regenerateMipMaps(ID3D11Texture2D* texture) {
+    context->GenerateMips(COMe(ID3D11ShaderResourceView, device->CreateShaderResourceView, texture, nullptr));
+}
+
 void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util::span<ui::vertex> vertices, RECT cull,
-                         bool distanceCoded) {
+                         mode mode) {
     D3D11_TEXTURE2D_DESC sourceDesc;
     D3D11_TEXTURE2D_DESC targetDesc;
     source->GetDesc(&sourceDesc);
@@ -124,7 +131,10 @@ void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util:
     D3D11_VIEWPORT vp = {0, 0, (FLOAT)targetDesc.Width, (FLOAT)targetDesc.Height, 0, 1};
     context->RSSetViewports(1, &vp);
     context->RSSetScissorRects(1, &cull);
-    context->PSSetShader(distanceCoded ? colorDistance : pixelId, nullptr, 0);
+    context->PSSetShader(mode == distanceCoded ? colorDistance
+                       : mode == blurH ? blurX
+                       : mode == blurV ? blurY
+                       : pixelId, nullptr, 0);
     context->OMSetBlendState(blendOver, nullptr, 0xFFFFFFFFU);
     context->OMSetRenderTargets(1, &rt, nullptr);
     context->PSSetShaderResources(0, 1, &sr);
