@@ -214,18 +214,124 @@ namespace appui {
         util::event<size_t>::handle sHandler = s.onChange.add([this](size_t v) { return onChange(3, v); });
         util::event<>::handle doneHandler = done.onClick.add([this]{ return onDone(); });
     };
+
+    // +------------------------------+
+    // | B -----|-------------------- |    (pretend those letters are icons signifying
+    // | M -----|-------------------- |     Brightness, Music, Settings, and Quit)
+    // |                      [S] [Q] |
+    // +------------------------------+    TODO static colors
+    struct tooltip_config : ui::grid {
+        tooltip_config(double bv, double ba)
+            : ui::grid(1, 2)
+        {
+            set(0, 0, &brightnessGrid);
+            set(0, 1, &bottomRow);
+            setColStretch(0, 1);
+            brightnessGrid.item.set(0, 0, &bLabel);
+            brightnessGrid.item.set(1, 0, &bSlider);
+            brightnessGrid.item.set(0, 1, &mLabel);
+            brightnessGrid.item.set(1, 1, &mSlider);
+            brightnessGrid.item.setColStretch(1, 1);
+            bottomRow.item.set(0, 0, &statusText, ui::grid::align_start);
+            bottomRow.item.set(1, 0, &sButton);
+            bottomRow.item.set(2, 0, &qButton);
+            bottomRow.item.setColStretch(0, 1);
+            bSlider.item.setValue(bv);
+            mSlider.item.setValue(ba);
+            sButton.item.setBorderless(true);
+            qButton.item.setBorderless(true);
+        }
+
+        void setStatusMessage(util::span<const wchar_t> msg) {
+            statusText.item.setText({{msg, ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 18, 0x80FFFFFFu}});
+        }
+
+    public:
+        util::event<int, double> onBrightness;
+        util::event<> onSettings;
+        util::event<> onQuit;
+
+    private:
+        padded<ui::grid> brightnessGrid{{10, 0}, 2, 2};
+        padded<ui::grid> bottomRow{{10, 0}, 3, 1};
+        padded<ui::label> statusText{{10, 10}};
+        padded<ui::label> bLabel{{10, 10},
+            std::vector<ui::text_part>{{L"B", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
+        padded<ui::label> mLabel{{10, 10},
+            std::vector<ui::text_part>{{L"M", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
+        padded<ui::slider> bSlider{{10, 10}};
+        padded<ui::slider> mSlider{{10, 10}};
+        ui::label sLabel{{{L"S", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
+        ui::label qLabel{{{L"Q", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
+        padded<ui::button> sButton{{10, 10}, sLabel};
+        padded<ui::button> qButton{{10, 10}, qLabel};
+        util::event<double>::handle bHandler = bSlider.item.onChange.add([this](double v) { return onBrightness(0, v); });
+        util::event<double>::handle mHandler = mSlider.item.onChange.add([this](double v) { return onBrightness(1, v); });
+        util::event<>::handle sHandler = sButton.item.onClick.add([this]{ return onSettings(); });
+        util::event<>::handle qHandler = qButton.item.onClick.add([this]{ return onQuit(); });
+    };
 }
 
 int ui::main() {
-    auto w = GetSystemMetrics(SM_CXSCREEN);
-    auto h = GetSystemMetrics(SM_CYSCREEN);
-    ui::window window{800, 800, (w - 800) / 2, (h - 800) / 2};
-    window.onDestroy.add([&] { ui::quit(); }).release();
+    ui::window mainWindow{1, 1};
+    mainWindow.onDestroy.add([&] { ui::quit(); }).release();
 
-    appui::padded<appui::sizing_config> mainContent{{20, 20}, 72, 40, 76, 3};
-    mainContent.item.onDone.add([&] { window.close(); }).release();
-    window.setRoot(&mainContent);
-    window.setBackground(0x60000000u, true);
-    window.show();
+    std::unique_ptr<ui::window> sizingWindow;
+    std::unique_ptr<ui::window> tooltipWindow;
+    appui::padded<appui::sizing_config> sizingConfig{{20, 20}, 72, 40, 76, 3};
+    appui::padded<appui::tooltip_config> tooltipConfig{{0, 10}, 0.7, 0.4};
+
+    sizingConfig.item.onDone.add([&] {
+        if (sizingWindow)
+            sizingWindow->close();
+        mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
+    }).release();
+
+    tooltipConfig.item.setStatusMessage(L"Serial port offline");
+    tooltipConfig.item.onQuit.add([&] { mainWindow.close(); }).release();
+    tooltipConfig.item.onSettings.add([&] {
+        mainWindow.clearNotificationIcon();
+        auto w = GetSystemMetrics(SM_CXSCREEN);
+        auto h = GetSystemMetrics(SM_CYSCREEN);
+        sizingWindow = std::make_unique<ui::window>(800, 800, (w - 800) / 2, (h - 800) / 2);
+        sizingWindow->setRoot(&sizingConfig);
+        sizingWindow->setBackground(0xa0000000u, true);
+        sizingWindow->setTopmost();
+        sizingWindow->show();
+    }).release();
+
+    mainWindow.onNotificationIcon.add([&](POINT p, bool primary) {
+        POINT size = {500, tooltipConfig.measureMin().y};
+        MONITORINFO monitor = {};
+        monitor.cbSize = sizeof(monitor);
+        if (GetMonitorInfo(MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST), &monitor)) {
+            // Put the window into the corner nearest to the notification tray.
+            POINT corners[4] = {
+                {monitor.rcWork.left, monitor.rcWork.top},
+                {monitor.rcWork.right, monitor.rcWork.top},
+                {monitor.rcWork.right, monitor.rcWork.bottom},
+                {monitor.rcWork.left, monitor.rcWork.bottom},
+            };
+            auto sqdistance = [](POINT a, POINT b) {
+                return (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y); };
+            POINT nearest = *std::min_element(std::begin(corners), std::end(corners),
+                [&](POINT a, POINT b) { return sqdistance(p, a) < sqdistance(p, b); });
+            p = {std::min(monitor.rcWork.right - size.x, std::max(monitor.rcWork.left, nearest.x)),
+                 std::min(monitor.rcWork.bottom - size.y, std::max(monitor.rcWork.top, nearest.y))};
+        }
+        tooltipWindow = std::make_unique<ui::window>(size.x, size.y, p.x, p.y, &mainWindow);
+        tooltipWindow->onBlur.add([&] { tooltipWindow->close(); }).release();
+        tooltipWindow->setBackground(0xa0000000u, true);
+        tooltipWindow->setDragByEmptyAreas(false);
+        tooltipWindow->setRoot(&tooltipConfig);
+        tooltipWindow->setTopmost(true);
+        tooltipWindow->show();
+    }).release();
+
+    if (false /*config not loaded*/) {
+        tooltipConfig.item.onSettings();
+    } else {
+        sizingConfig.item.onDone();
+    }
     return ui::dispatch();
 }
