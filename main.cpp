@@ -14,16 +14,15 @@
 
 namespace appui {
     template <typename T>
-    struct padded : ui::spacer {
+    struct padded : T {
         template <typename... Args>
         padded(POINT padding, Args&&... args)
-            : ui::spacer({padding.x * 2, padding.y * 2})
-            , item(std::forward<Args>(args)...)
+            : T(std::forward<Args>(args)...)
+            , pad({padding.x, padding.y, padding.x, padding.y}, *this)
         {
-            setChild(&item);
         }
 
-        T item;
+        ui::spacer pad;
     };
 
     // name [-] N [+]
@@ -35,7 +34,7 @@ namespace appui {
             , max(max)
             , step(step)
         {
-            grid.set(0, row, &label, ui::grid::align_end);
+            grid.set(0, row, &label.pad, ui::grid::align_end);
             grid.set(1, row, &decButton);
             grid.set(2, row, &numLabel);
             grid.set(3, row, &incButton);
@@ -83,19 +82,19 @@ namespace appui {
                           size_t min, size_t max, size_t step)
             : controlled_number(grid, row, name, min, max, step)
         {
-            grid.set(2, row, &slider);
+            grid.set(2, row, &slider.pad);
             grid.set(4, row, &numLabel);
         }
 
         void setValue(size_t v) override {
-            slider.item.setValue(v, min, max, step);
+            slider.setValue(v, min, max, step);
             controlled_number::setValue(v);
         }
 
     private:
         padded<ui::slider> slider{{10, 15}};
-        util::event<double>::handle sliderHandler = slider.item.onChange.add([this](double) {
-            setValue(slider.item.mapValue(min, max, step)); });
+        util::event<double>::handle sliderHandler = slider.onChange.add([this](double) {
+            setValue(slider.mapValue(min, max, step)); });
     };
 
     struct screensetup : ui::grid {
@@ -169,15 +168,15 @@ namespace appui {
             : ui::grid(1, 4)
         {
             set(0, 0, &image);
-            set(0, 1, &sliderGrid);
-            set(0, 2, &help);
-            set(0, 3, &bottomRow);
+            set(0, 1, &sliderGrid.pad);
+            set(0, 2, &help.pad);
+            set(0, 3, &bottomRow.pad);
             setRowStretch(0, 1);
             setColStretch(0, 1);
-            sliderGrid.item.set(4, 3, &constNumWidth);
-            sliderGrid.item.setColStretch(2, 1);
-            bottomRow.item.set(5, 0, &done);
-            bottomRow.item.setColStretch(4, 1);
+            sliderGrid.set(4, 3, &constNumWidth);
+            sliderGrid.setColStretch(2, 1);
+            bottomRow.set(5, 0, &done);
+            bottomRow.setColStretch(4, 1);
             w.setValue(wv);
             h.setValue(hv);
             e.setValue(ev);
@@ -198,15 +197,15 @@ namespace appui {
         padded<ui::grid> bottomRow{{35, 20}, 6, 1};
         // The actual limit is 1 <= w + h <= LIMIT, but sliders jumping around
         // would probably be confusing.
-        controlled_slider w{sliderGrid.item, 0, L"Screen width",  1, LIMIT, 1};
-        controlled_slider h{sliderGrid.item, 1, L"Screen height", 1, LIMIT, 1};
-        controlled_slider e{sliderGrid.item, 2, L"Music LEDs",    2, LIMIT, 2};
-        controlled_number s{bottomRow.item,  0, L"Serial port",   1, 16,    1};
+        controlled_slider w{sliderGrid, 0, L"Screen width",  1, LIMIT, 1};
+        controlled_slider h{sliderGrid, 1, L"Screen height", 1, LIMIT, 1};
+        controlled_slider e{sliderGrid, 2, L"Music LEDs",    2, LIMIT, 2};
+        controlled_number s{bottomRow,  0, L"Serial port",   1, 16,    1};
         // A hacky way to set a constant size for the number labels:
         ui::spacer constNumWidth{{60, 1}};
         padded<ui::label> doneLabel{{20, 0},
             std::vector<ui::text_part>{{L"Done", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}}};
-        ui::button done{doneLabel};
+        ui::button done{doneLabel.pad};
 
         util::event<size_t>::handle wHandler = w.onChange.add([this](size_t v) { return onChange(0, v); });
         util::event<size_t>::handle hHandler = h.onChange.add([this](size_t v) { return onChange(1, v); });
@@ -227,23 +226,23 @@ namespace appui {
             set(0, 0, &brightnessGrid);
             set(0, 1, &bottomRow);
             setColStretch(0, 1);
-            brightnessGrid.item.set(0, 0, &bLabel);
-            brightnessGrid.item.set(1, 0, &bSlider);
-            brightnessGrid.item.set(0, 1, &mLabel);
-            brightnessGrid.item.set(1, 1, &mSlider);
-            brightnessGrid.item.setColStretch(1, 1);
-            bottomRow.item.set(0, 0, &statusText, ui::grid::align_start);
-            bottomRow.item.set(1, 0, &sButton);
-            bottomRow.item.set(2, 0, &qButton);
-            bottomRow.item.setColStretch(0, 1);
-            bSlider.item.setValue(bv);
-            mSlider.item.setValue(ba);
-            sButton.item.setBorderless(true);
-            qButton.item.setBorderless(true);
+            brightnessGrid.set(0, 0, &bLabel.pad);
+            brightnessGrid.set(1, 0, &bSlider.pad);
+            brightnessGrid.set(0, 1, &mLabel.pad);
+            brightnessGrid.set(1, 1, &mSlider.pad);
+            brightnessGrid.setColStretch(1, 1);
+            bottomRow.set(0, 0, &statusText.pad, ui::grid::align_start);
+            bottomRow.set(1, 0, &sButton.pad);
+            bottomRow.set(2, 0, &qButton.pad);
+            bottomRow.setColStretch(0, 1);
+            bSlider.setValue(bv);
+            mSlider.setValue(ba);
+            sButton.setBorderless(true);
+            qButton.setBorderless(true);
         }
 
         void setStatusMessage(util::span<const wchar_t> msg) {
-            statusText.item.setText({{msg, ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 18, 0x80FFFFFFu}});
+            statusText.setText({{msg, ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 18, 0x80FFFFFFu}});
         }
 
     public:
@@ -253,22 +252,24 @@ namespace appui {
 
     private:
         padded<ui::grid> brightnessGrid{{10, 0}, 2, 2};
-        padded<ui::grid> bottomRow{{10, 0}, 3, 1};
-        padded<ui::label> statusText{{10, 10}};
         padded<ui::label> bLabel{{10, 10},
             std::vector<ui::text_part>{{L"B", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
         padded<ui::label> mLabel{{10, 10},
             std::vector<ui::text_part>{{L"M", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
         padded<ui::slider> bSlider{{10, 10}};
         padded<ui::slider> mSlider{{10, 10}};
+
+        padded<ui::grid> bottomRow{{10, 0}, 3, 1};
+        padded<ui::label> statusText{{10, 10}};
         ui::label sLabel{{{L"S", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
         ui::label qLabel{{{L"Q", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
         padded<ui::button> sButton{{10, 10}, sLabel};
         padded<ui::button> qButton{{10, 10}, qLabel};
-        util::event<double>::handle bHandler = bSlider.item.onChange.add([this](double v) { return onBrightness(0, v); });
-        util::event<double>::handle mHandler = mSlider.item.onChange.add([this](double v) { return onBrightness(1, v); });
-        util::event<>::handle sHandler = sButton.item.onClick.add([this]{ return onSettings(); });
-        util::event<>::handle qHandler = qButton.item.onClick.add([this]{ return onQuit(); });
+
+        util::event<double>::handle bHandler = bSlider.onChange.add([this](double v) { return onBrightness(0, v); });
+        util::event<double>::handle mHandler = mSlider.onChange.add([this](double v) { return onBrightness(1, v); });
+        util::event<>::handle sHandler = sButton.onClick.add([this]{ return onSettings(); });
+        util::event<>::handle qHandler = qButton.onClick.add([this]{ return onQuit(); });
     };
 }
 
@@ -281,20 +282,20 @@ int ui::main() {
     appui::padded<appui::sizing_config> sizingConfig{{20, 20}, 72, 40, 76, 3};
     appui::padded<appui::tooltip_config> tooltipConfig{{0, 10}, 0.7, 0.4};
 
-    sizingConfig.item.onDone.add([&] {
+    sizingConfig.onDone.add([&] {
         if (sizingWindow)
             sizingWindow->close();
         mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
     }).release();
 
-    tooltipConfig.item.setStatusMessage(L"Serial port offline");
-    tooltipConfig.item.onQuit.add([&] { mainWindow.close(); }).release();
-    tooltipConfig.item.onSettings.add([&] {
+    tooltipConfig.setStatusMessage(L"Serial port offline");
+    tooltipConfig.onQuit.add([&] { mainWindow.close(); }).release();
+    tooltipConfig.onSettings.add([&] {
         mainWindow.clearNotificationIcon();
         auto w = GetSystemMetrics(SM_CXSCREEN);
         auto h = GetSystemMetrics(SM_CYSCREEN);
         sizingWindow = std::make_unique<ui::window>(800, 800, (w - 800) / 2, (h - 800) / 2);
-        sizingWindow->setRoot(&sizingConfig);
+        sizingWindow->setRoot(&sizingConfig.pad);
         sizingWindow->setBackground(0xa0000000u, true);
         sizingWindow->setTopmost();
         sizingWindow->show();
@@ -328,15 +329,15 @@ int ui::main() {
         tooltipWindow->setBackground(0xa0000000u, true);
         tooltipWindow->setDragByEmptyAreas(false);
         tooltipWindow->setGravity(hGravity, vGravity);
-        tooltipWindow->setRoot(&tooltipConfig);
+        tooltipWindow->setRoot(&tooltipConfig.pad);
         tooltipWindow->setTopmost(true);
         tooltipWindow->show();
     }).release();
 
     if (false /*config not loaded*/) {
-        tooltipConfig.item.onSettings();
+        tooltipConfig.onSettings();
     } else {
-        sizingConfig.item.onDone();
+        sizingConfig.onDone();
     }
     return ui::dispatch();
 }

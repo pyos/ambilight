@@ -22,7 +22,8 @@ void ui::texrect::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT tot
         QUADP(p1.x, p2.y, p2.x, p3.y, 0, il, ib, ir, ab), // bottom
         QUADP(p2.x, p2.y, p3.x, p3.y, 0, ir, ib, ar, ab), // bottom-right
     };
-    ctx.draw(target, getTexture(ctx), vs, dirty);
+    if (auto texture = getTexture(ctx))
+        ctx.draw(target, texture, vs, dirty);
     if (contents)
         contents->draw(ctx, target, {p1.x, p1.y, p2.x, p2.y}, rectIntersection(dirty, {p1.x, p1.y, p2.x, p2.y}));
 }

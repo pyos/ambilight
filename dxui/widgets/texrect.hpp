@@ -18,18 +18,37 @@ namespace ui {
     //
     // A child widget is drawn into the `inner` part.
     //
-    // TODO forward mouse events within the child widget's rectangle.
-    //
     struct texrect : widget {
         texrect() = default;
         texrect(widget& child)
             : contents(&child, *this)
         {}
 
+        void setContents(widget* w) {
+            contents = widget_handle(w, *this);
+            invalidateSize();
+        }
+
         void onChildRelease(widget& w) override {
             // assert(contents.get() == &w);
-            contents.reset();
-            invalidateSize();
+            setContents(nullptr);
+        }
+
+        bool onMouse(POINT abs, int keys) override {
+            if (!contents)
+                return false;
+            auto [w, h] = size();
+            auto [pl, pt, pr, pb] = getPadding();
+            if (!rectHit(RECT{pl, pt, w - pr, h - pb}, relative(abs)))
+                return false;
+            forwardMouse = true;
+            return contents->onMouse(abs, keys);
+        }
+
+        void onMouseLeave() override {
+            if (contents && forwardMouse)
+                contents->onMouseLeave();
+            forwardMouse = false;
         }
 
     private:
@@ -65,5 +84,6 @@ namespace ui {
 
     private:
         widget_handle contents;
+        bool forwardMouse = false;
     };
 }
