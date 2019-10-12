@@ -1,5 +1,5 @@
 # Character map for texture Segoe UI.png
-Segoe UI, 48, normal
+Segoe UI, 48, normal, 12
 # Format: ordinal, x, y, width, height, origin x, origin y, advance
    48,   371,    66,    40,    52,     7,    43,    26
    49,   716,    66,    30,    52,     4,    43,    26

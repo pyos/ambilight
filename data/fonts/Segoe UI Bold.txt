@@ -1,5 +1,5 @@
 # Character map for texture Segoe UI Bold.png
-Segoe UI, 48, bold
+Segoe UI, 48, bold, 12
 # Format: ordinal, x, y, width, height, origin x, origin y, advance
    48,   393,    66,    42,    52,     7,    43,    27
    49,     0,   119,    32,    52,     4,    43,    27

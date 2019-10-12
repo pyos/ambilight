@@ -1,5 +1,5 @@
 # Character map for texture Cambria.png
-Cambria, 48, normal
+Cambria, 48, normal, 12
 # Format: ordinal, x, y, width, height, origin x, origin y, advance
    48,   361,    61,    38,    51,     6,    41,    26
    49,    38,   162,    37,    50,     5,    41,    26

@@ -15,9 +15,11 @@ namespace ui {
     };
 
     struct font {
+        font(util::span<const uint8_t> texture, util::span<const char> charmap);
+
         font(ui::resource texture, ui::resource charmap)
-            : texture(ui::read(texture, L"PNG"))
-            , charmap(ui::read(charmap, L"TEXT").reinterpret<const char>())
+            : font(ui::read(texture, L"PNG"),
+                   ui::read(charmap, L"TEXT").reinterpret<const char>())
         {}
 
         font(int resourceId)
@@ -38,16 +40,22 @@ namespace ui {
         // Return the native font size, i.e. the size of symbols in texture data.
         // The text looks best at that size, although there is distance field
         // based antialiasing.
-        int nativeSize() const;
+        int nativeSize() const { return nativeSize_; }
+
+        // Return the baseline relative to the native font size, i.e. the distance
+        // between the bottom edge of a line and the point onto which the origin
+        // of a character is placed.
+        int baseline() const { return baseline_; }
 
         // Retrieve info for a particular code point.
         const font_symbol& operator[](wchar_t) const;
 
     private:
         util::span<const uint8_t> texture;
-        util::span<const char> charmap;
-        mutable std::vector<font_symbol> ascii;
-        mutable int nativeSize_ = -1;
+        std::vector<font_symbol> ascii;
+        std::vector<std::pair<wchar_t, font_symbol>> unicode;
+        int nativeSize_;
+        int baseline_;
     };
 
     struct text_part {

@@ -16,7 +16,8 @@ for file in os.listdir(root):
             else 'bold' if data['bold'] \
             else 'italic' if data['italic'] \
             else 'normal'
-        fd.write('{name}, {size}, {kind}\n'.format_map(data))
+        data['baseline'] = data['size'] / 4
+        fd.write('{name}, {size}, {kind}, {baseline}\n'.format_map(data))
         fd.write('# Format: ordinal, x, y, width, height, origin x, origin y, advance\n')
         for char, desc in data["characters"].items():
             desc['codepoint'] = ord(char)

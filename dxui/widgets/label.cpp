@@ -1,31 +1,38 @@
 #include "data.hpp"
 #include "label.hpp"
 
-int ui::font::nativeSize() const {
-    (*this)[0];
-    return nativeSize_;
+ui::font::font(util::span<const uint8_t> texture, util::span<const char> charmap)
+    : texture(texture)
+{
+    ascii.resize(256);
+    readPseudoCSV<8>(charmap, [&](size_t lineno, util::span<const char> columns[8]) {
+        if (lineno == 0) {
+            nativeSize_ = atol(columns[1].data());
+            baseline_ = atol(columns[3].data());
+            return;
+        }
+        uint32_t cp = atol(columns[0].data());
+        auto& c = cp < 256 ? ascii[cp] : [&]() -> ui::font_symbol& {
+            unicode.emplace_back(cp, ui::font_symbol{});
+            return unicode.back().second;
+        }();
+        c.x = atoi(columns[1].data());
+        c.y = atoi(columns[2].data());
+        c.w = atoi(columns[3].data());
+        c.h = atoi(columns[4].data());
+        c.originX = atoi(columns[5].data());
+        c.originY = atoi(columns[6].data());
+        c.advance = atoi(columns[7].data());
+    });
+    std::sort(unicode.begin(), unicode.end(), [&](auto& a, auto& b) { return a.first < b.first; });
 }
 
 const ui::font_symbol& ui::font::operator[](wchar_t point) const {
     static const ui::font_symbol empty = {};
-    if (ascii.empty()) {
-        ascii.resize(256);
-        readPseudoCSV<8>(charmap, [&](size_t lineno, util::span<const char> columns[8]) {
-            if (lineno == 0) {
-                nativeSize_ = atol(columns[1].data());
-            } else if (uint32_t cp = atol(columns[0].data()); cp < 256) {
-                auto& c = ascii[cp];
-                c.x = atoi(columns[1].data());
-                c.y = atoi(columns[2].data());
-                c.w = atoi(columns[3].data());
-                c.h = atoi(columns[4].data());
-                c.originX = atoi(columns[5].data());
-                c.originY = atoi(columns[6].data());
-                c.advance = atoi(columns[7].data());
-            }
-        });
-    }
-    return point < 256 ? ascii[point] : empty;
+    if (point < 256)
+        return ascii[point];
+    auto it = std::lower_bound(unicode.begin(), unicode.end(), point, [](auto& p, wchar_t c) { return p.first < c; });
+    return it == unicode.end() || it->first != point ? empty : it->second;
 }
 
 POINT ui::label::measureMinImpl() const {
@@ -66,12 +73,17 @@ void ui::label::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total
         quads.reserve(std::max_element(data.begin(), data.end(), [](auto& a, auto& b) {
             return a.data.size() < b.data.size(); })->data.size());
     // TODO use DirectWrite or something.
-    double y = 0;
+    double ty = 0;
     split<const ui::text_part>(data, [](auto& c) { return c.breakAfter; }, 0, [&](size_t, util::span<const ui::text_part> parts) {
+        double ly = 0;
+        double bs = 0;
+        for (const ui::text_part& part : parts) {
+            ly = std::max(ly, part.fontSize * lineHeight);
+            bs = std::max(bs, part.fontSize * part.font.get().baseline() / (double)part.font.get().nativeSize());
+        }
+        ty += ly;
         double x = originX;
-        double ly = std::max_element(parts.begin(), parts.end(), [](auto& a, auto& b) {
-            return a.fontSize < b.fontSize; })->fontSize * lineHeight;
-        y += ly * 0.75;
+        double y = ty - bs;
         for (const ui::text_part& part : parts) {
             quads.clear();
             double scale = (double)part.fontSize / part.font.get().nativeSize();
@@ -89,6 +101,5 @@ void ui::label::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total
                 vertex.clr = ARGB2CLR(part.fontColor);
             ctx.draw(target, part.font.get().loadTexture(ctx), quads, dirty, true);
         }
-        y += ly * 0.25;
     });
 }

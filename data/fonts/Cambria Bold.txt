@@ -1,5 +1,5 @@
 # Character map for texture Cambria Bold.png
-Cambria, 48, bold
+Cambria, 48, bold, 12
 # Format: ordinal, x, y, width, height, origin x, origin y, advance
    48,   403,    61,    41,    51,     6,    41,    28
    49,    41,   162,    40,    50,     5,    41,    28
