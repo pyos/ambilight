@@ -112,6 +112,9 @@ namespace ui {
         void draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util::span<vertex> vertices, RECT cull,
                   bool distanceCoded = false);
 
+        // Convert raw BGRA data into a texture. Size must be a multiple of `4w`.
+        winapi::com_ptr<ID3D11Texture2D> textureFromRaw(util::span<const uint8_t>, size_t w, bool mipmaps = false);
+
         // Convert a PNG image into a BGRA 32-bit texture.
         winapi::com_ptr<ID3D11Texture2D> textureFromPNG(util::span<const uint8_t>, bool mipmaps = false);
 

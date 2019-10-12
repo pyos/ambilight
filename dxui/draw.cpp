@@ -145,18 +145,21 @@ winapi::com_ptr<ID3D11Texture2D> ui::dxcontext::textureFromPNG(util::span<const 
     winapi::throwOnFalse(cnv->GetSize(&width, &height));
     std::vector<uint8_t> tmp(width * height * 4);
     winapi::throwOnFalse(cnv->CopyPixels(nullptr, width * 4, width * height * 4, tmp.data()));
+    return textureFromRaw(tmp, width, mipmaps);
+}
 
+winapi::com_ptr<ID3D11Texture2D> ui::dxcontext::textureFromRaw(util::span<const uint8_t> in, size_t w, bool mipmaps) {
     D3D11_TEXTURE2D_DESC desc = {};
-    desc.Width = width;
-    desc.Height = height;
+    desc.Width = (UINT)w;
+    desc.Height = (UINT)(in.size() / w / 4);
     desc.MipLevels = 1;
     desc.ArraySize = 1;
     desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     desc.SampleDesc.Count = 1;
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     D3D11_SUBRESOURCE_DATA initData = {};
-    initData.pSysMem = tmp.data();
-    initData.SysMemPitch = width * 4;
+    initData.pSysMem = in.data();
+    initData.SysMemPitch = (UINT)(w * 4);
     auto initial = COMe(ID3D11Texture2D, device->CreateTexture2D, &desc, &initData);
     if (!mipmaps)
         return initial;
