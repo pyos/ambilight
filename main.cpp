@@ -105,8 +105,8 @@ namespace appui {
             set(1, 2, &strip);
             setColStretch(0, 1); setColStretch(1, 6); setColStretch(2, 1);
             setRowStretch(0, 1); setRowStretch(1, 6); setRowStretch(2, 1);
-            strip.set(1, 0, &stripLeft, ui::grid::align_end);
-            strip.set(2, 0, &stripRight, ui::grid::align_start);
+            strip.set(1, 0, &stripL, ui::grid::align_end);
+            strip.set(2, 0, &stripR, ui::grid::align_start);
             strip.setColStretch(0, 1);
             strip.setColStretch(1, 3);
             strip.setColStretch(2, 3);
@@ -115,7 +115,8 @@ namespace appui {
 
     private:
         static winapi::com_ptr<ID3D11Texture2D> loadTexture(ui::dxcontext& ctx) {
-            return ctx.textureFromPNG(ui::read(ui::fromBundled(IDI_SCREENSETUP), L"PNG")); }
+            return ctx.textureFromPNG(ui::read(ui::fromBundled(IDI_SCREENSETUP), L"PNG"));
+        }
 
         struct fixedAspectRatio : ui::widget {
             POINT measureMinImpl() const override { return {60, 1}; }
@@ -124,32 +125,15 @@ namespace appui {
             void drawImpl(ui::dxcontext&, ID3D11Texture2D*, RECT, RECT) const override {}
         } stretch16To9;
 
-        struct screen : ui::texrect {
-            using ui::texrect::texrect;
-            winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
-                return ctx.cachedTexture<loadTexture>(); }
-            RECT getOuter() const override { return {0, 0, 128, 128}; }
-            RECT getInner() const override { return {64, 64, 64, 64}; }
-        } screen{stretch16To9};
-
-        struct hstretch : ui::widget  {
+        struct hstretch : ui::widget {
             POINT measureMinImpl() const override { return {0, 0}; }
             POINT measureImpl(POINT fit) const override { return {fit.x, 0}; }
             void drawImpl(ui::dxcontext&, ID3D11Texture2D*, RECT, RECT) const override {}
         } stretchAnyTo0x1, stretchAnyTo0x2;
 
-        struct stripLeft : screen {
-            using screen::screen;
-            RECT getOuter() const override { return {22, 128, 64, 154}; }
-            RECT getInner() const override { return {44, 142, 44, 142}; }
-        } stripLeft{stretchAnyTo0x1};
-
-        struct stripRight : stripLeft {
-            using stripLeft::stripLeft;
-            RECT getOuter() const override { return {64, 128, 106, 154}; }
-            RECT getInner() const override { return {84, 142, 84, 142}; }
-        } stripRight{stretchAnyTo0x2};
-
+        ui::image<loadTexture> screen{{ 0,   0, 128, 128}, {64,  64, 64,  64}, stretch16To9};
+        ui::image<loadTexture> stripL{{22, 128,  64, 154}, {44, 142, 44, 142}, stretchAnyTo0x1};
+        ui::image<loadTexture> stripR{{64, 128, 106, 154}, {84, 142, 84, 142}, stretchAnyTo0x2};
         ui::grid strip{4, 1};
     };
 

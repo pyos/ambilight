@@ -73,17 +73,32 @@ namespace ui {
         void drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
 
     protected:
-        virtual winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const = 0;
-        virtual RECT getOuter() const = 0;
-        virtual RECT getInner() const {
-            // Default to sampling the color in the middle of the rectangle.
-            RECT r = getOuter();
+        static RECT middleOf(RECT r) {
             POINT p = {(r.left + r.right) / 2, (r.top + r.bottom) / 2};
             return {p.x, p.y, p.x, p.y};
         }
 
+        virtual winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const = 0;
+        virtual RECT getOuter() const = 0;
+        virtual RECT getInner() const { return middleOf(getOuter()); }
+
     private:
         widget_handle contents;
         bool forwardMouse = false;
+    };
+
+    // Like a texrect, but with a constant texture.
+    template <winapi::com_ptr<ID3D11Texture2D> (*F)(ui::dxcontext&)>
+    struct image : texrect {
+        image(RECT outer) : outer(outer), inner(middleOf(outer)) {}
+        image(RECT outer, RECT inner) : outer(outer), inner(inner) {}
+        image(RECT outer, RECT inner, widget& contents) : texrect(contents), outer(outer), inner(inner) {}
+
+    private:
+        winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
+            return ctx.cachedTexture<F>(); }
+        RECT getOuter() const override { return outer; }
+        RECT getInner() const override { return inner; }
+        RECT outer, inner;
     };
 }
