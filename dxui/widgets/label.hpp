@@ -60,7 +60,7 @@ namespace ui {
     };
 
     struct label : widget {
-        label(std::vector<text_part> data)
+        label(std::vector<text_part> data = {})
             : data(std::move(data))
             , hideOverflow(false)
             , lineHeight(1.3)
