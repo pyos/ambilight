@@ -8,16 +8,27 @@
 #include "dxui/widgets/spacer.hpp"
 #include "dxui/widgets/wincontrol.hpp"
 
+#define AMBILIGHT_PC
 #include "arduino/arduino.h"
+#undef AMBILIGHT_PC
 
+#include "capture.h"
+#include "color.hpp"
+#include "serial.hpp"
+#include "thread.hpp"
+
+#include <atomic>
 #include <string>
+#include <condition_variable>
+#include <mutex>
+#include <optional>
 
 namespace appui {
     struct state {
-        size_t width;
-        size_t height;
-        size_t musicLeds;
-        size_t serial;
+        std::atomic<size_t> width;
+        std::atomic<size_t> height;
+        std::atomic<size_t> musicLeds;
+        std::atomic<size_t> serial;
         double brightnessV;
         double brightnessA;
         double gamma;
@@ -250,9 +261,9 @@ namespace appui {
 
     struct color_config_tab : gray_bg {
         color_config_tab(const state& init, util::event<int, double>& onChange)
-            : gray_bg(grid.pad)
-            , onChange(onChange)
+            : onChange(onChange)
         {
+            setContents(&grid.pad);
             grid.set(0, 0, &gammaLabel.pad);
             grid.set(0, 1, &rOffLabel.pad);
             grid.set(0, 2, &gOffLabel.pad);
@@ -287,38 +298,40 @@ namespace appui {
 
     struct color_select_tab : gray_bg {
         color_select_tab(const state& init, util::event<uint32_t>& onChange)
-            : gray_bg(grid.pad)
-            , onChange(onChange)
+            : onChange(onChange)
         {
+            setContents(&grid.pad);
             grid.set(0, 0, &hueLabel.pad, ui::grid::align_end);
             grid.set(1, 0, &hueSlider.pad);
             grid.set(0, 1, &satLabel.pad, ui::grid::align_end);
             grid.set(1, 1, &satSlider.pad);
             grid.setColStretch(1, 1);
-            // TODO convert color to HSV & set sliders
+            auto [a, h, s, v] = argb2ahsv(u2qd(init.color));
+            hueSlider.setValue(h);
+            satSlider.setValue(s);
         }
 
-        bool emitEvent() {
-            // TODO convert values to RGB & emit onChange
-            return onChange(0x00000000u);
+        uint32_t value() const {
+            return qd2u(ahsv2argb({1, hueSlider.value(), satSlider.value(), 1}));
         }
 
-    private:
+    public:
         util::event<uint32_t>& onChange;
+    private:
         padded<ui::grid> grid{{10, 20}, 2, 2};
         padded_label hueLabel{{10, 10}, {L"Hue", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}};
         padded_label satLabel{{10, 10}, {L"Saturation", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}};
         padded<h_slider> hueSlider{{10, 10}};
         padded<s_slider> satSlider{{10, 10}};
-        util::event<double>::handle hueHandler = hueSlider.onChange.add([this](double) { return emitEvent(); });
-        util::event<double>::handle satHandler = satSlider.onChange.add([this](double) { return emitEvent(); });
+        util::event<double>::handle hueHandler = hueSlider.onChange.add([this](double) { return onChange(value()); });
+        util::event<double>::handle satHandler = satSlider.onChange.add([this](double) { return onChange(value()); });
     };
 
     struct extra_button : gray_bg {
         extra_button(const ui::text_part& text)
-            : gray_bg(button)
-            , label({text})
+            : label({text})
         {
+            setContents(&button);
             pad.set(0, 0, &label);
             pad.setColStretch(0, 1);
             pad.setRowStretch(0, 1);
@@ -366,10 +379,12 @@ namespace appui {
         extra_button gammaButton{{L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         extra_button colorButton{{L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         util::event<bool>::handle gammaH = gammaButton.onClick.add([this](bool show) {
-            set(0, 0, show ? &gammaTab : nullptr); });
+            set(0, 0, show ? &gammaTab : nullptr);
+        });
         util::event<bool>::handle colorH = colorButton.onClick.add([this](bool show) {
             set(0, 1, show ? &colorTab : nullptr);
-            return colorTab.emitEvent(); });
+            return colorTab.onChange(colorTab.value() & (show ? 0xFFFFFFFFu : 0x00FFFFFFu));
+        });
     };
 
     struct tooltip_config : ui::grid {
@@ -438,23 +453,179 @@ int ui::main() {
     mainWindow.onDestroy.add([&] { ui::quit(); }).release();
 
     // TODO load from file
-    const appui::state fake = {
-        72, 40, 76, 3, 0.7, 0.4, 2.0, 1.0, 1.0, 1.0, 0x00000000u
+    appui::state fake = {
+        72, 40, 76, 3, 0.7, 0.4, 2.0, 1.0, 1.0, 1.0, 0x00FFFFFFu
     };
+
+    auto loopThread = [&](auto&& f) {
+        return [&, f = std::move(f)](std::atomic<bool>& terminate) {
+            while (!terminate) try {
+                f(terminate);
+            } catch (const std::exception /*util::retry*/&) {
+                Sleep(500);
+            } /*catch (const util::fatal& err) {
+                std::lock_guard<std::mutex> lock(mut);
+                unexpectedErrorText = err.msg;
+                PostMessage(window, ID_MESSAGE_FATAL_ERROR, 0, 0);
+                return;
+            }*/
+        };
+    };
+
+    std::mutex mut;
+    std::condition_variable frameEv;
+    bool frameDirty = false;
+    UINT frameData[4][AMBILIGHT_CHUNKS_PER_STRIP * AMBILIGHT_SERIAL_CHUNK];
+
+    auto updateLocked = [&](auto&& unsafePart) {
+        std::lock_guard<std::mutex> lock(mut);
+        if (!unsafePart())
+            return;
+        frameDirty = true;
+        frameEv.notify_all();
+        // TODO render the preview
+    };
+
+    auto updateFrom = [&](UINT* a, UINT* b, UINT* c, UINT* d, size_t w, size_t h, size_t m) {
+        UINT* ptrs[] = {a, b, c, d};
+        size_t lens[] = {w + h, w + h, m / 2, m / 2};
+        updateLocked([&]{
+            bool any = false;
+            for (size_t i = 0; i < 4; i++) if (ptrs[i]) {
+                if (std::equal(frameData[i], frameData[i] + lens[i], ptrs[i]))
+                    continue;
+                std::copy(ptrs[i], ptrs[i] + lens[i], frameData[i]);
+                any = true;
+            }
+            return any;
+        });
+    };
+
+/*
+    auto captureVideo = loopThread([&](std::atomic<bool>& terminate) {
+        auto cap = captureScreen(0, AMBILIGHT_WIDTH, AMBILIGHT_HEIGHT);
+        while (!terminate) if (auto in = cap->next()) {
+            UINT averageComponents[4] = {0, 0, 0, 0};
+            for (const auto& color : in.reinterpret<const BYTE[4]>())
+                for (UINT c = 0; c < 4; c++)
+                    averageComponents[c] += color[c];
+            averageColor = 0xFF000000u
+                        | (averageComponents[2] / AMBILIGHT_WIDTH / AMBILIGHT_HEIGHT) << 16
+                        | (averageComponents[1] / AMBILIGHT_WIDTH / AMBILIGHT_HEIGHT) << 8
+                        | (averageComponents[0] / AMBILIGHT_WIDTH / AMBILIGHT_HEIGHT);
+            UINT data[AMBILIGHT_VIDEO_LEDS];
+            auto out = data;
+#define W_PX(y, x) do { *out++ = in[(y) * AMBILIGHT_WIDTH + (x)]; } while (0)
+            // bottom right -> bottom left -> top left; bottom right -> top right -> top left
+            for (UINT x = AMBILIGHT_WIDTH;  x--; ) W_PX(AMBILIGHT_HEIGHT - 1, x);
+            for (UINT y = AMBILIGHT_HEIGHT; y--; ) W_PX(y, 0);
+            for (UINT y = AMBILIGHT_HEIGHT; y--; ) W_PX(y, AMBILIGHT_WIDTH - 1);
+            for (UINT x = AMBILIGHT_WIDTH;  x--; ) W_PX(0, x);
+#undef W_PX
+            updateRange(0, AMBILIGHT_VIDEO_LEDS, data);
+        }
+    });
+*/
+
+// Coefficients for ensuring uniformity of the spectrum. Each octave's power
+// is divided by e^(Mx) / N, where x = the index of that octave from the end.
+#define DFT_EQUALIZER_M 0.55f
+#define DFT_EQUALIZER_N 0.12f
+
+    auto captureAudio = loopThread([&](std::atomic<bool>& terminate) {
+        double lastH = 0;
+        double lastS = 0;
+        auto cap = captureDefaultAudioOutput();
+        std::vector<UINT> data(fake.musicLeds);
+        updateFrom(nullptr, nullptr, data.data(), data.data() + data.size() / 2, 0, 0, data.size());
+        while (!terminate) if (auto in = cap->next()) {
+            // 1. Need a lower bound on value so that the strip is always visible at all. 
+            // 2. When value is 0, both hue and saturation become undefined (all colors are black),
+            //    causing an abrupt switch to white at the end of a fade to black. Keep the old
+            //    hue/saturation when any value is OK to avoid that.
+            // TODO average screen color
+            auto [a, h, s, v] = argb2ahsv(u2qd(fake.color));
+            auto [_, r, g, b] = ahsv2argb({1, (h = lastH = s ? h : lastH), (s = lastS = v ? s : lastS), std::max(v, 0.5)});
+            UINT delta = qd2u({0, r * 2 / in.size(), g * 2 / in.size(), b * 2 / in.size()});
+            size_t i = 0, j = 0;
+            for (size_t lim : {data.size() / 2, data.size()}) {
+                for (size_t k = in.size() / 2; k--; j++)
+                    for (size_t w = tanh(in[j] / exp((k + 1) * DFT_EQUALIZER_M) / DFT_EQUALIZER_N) * (lim - i); w--; )
+                        data[i++] = 0xFF000000u | (delta * (k + 1));
+                while (i < lim)
+                    data[i++] = 0xFF000000u;
+            }
+            updateFrom(nullptr, nullptr, data.data(), data.data() + data.size() / 2, 0, 0, data.size());
+        }
+    });
+
+    auto transmitData = loopThread([&](std::atomic<bool>& terminate) {
+        auto filename = L"\\\\.\\COM" + std::to_wstring(fake.serial.load());
+        serial comm{filename.c_str()};
+        for (size_t iter = 0; !terminate; iter++) {
+            if (auto lock = std::unique_lock<std::mutex>(mut)) {
+                // Ping the arduino at least once per ~1.6s so that it knows the app is still running.
+                if (iter % 16 && !frameEv.wait_for(lock, std::chrono::milliseconds(100), [&]{ return frameDirty; }))
+                    continue;
+                const size_t w = fake.width, h = fake.height, m = fake.musicLeds;
+                const size_t lengths[4] = {w + h, w + h, m / 2, m / 2};
+                for (size_t i = 0, strip = 0; strip < 4; i += lengths[strip++])
+                    // TODO color offsets
+                    comm.update((uint8_t)strip, frameData[strip],
+                        (float)fake.gamma, (float)(strip < 2 ? fake.brightnessV : fake.brightnessA), 0, 0);
+                frameDirty = false;
+            }
+            comm.submit();
+        }
+    });
+
+    std::optional<util::thread> serialThread{transmitData};
+    std::optional<util::thread> videoCaptureThread;
+    std::optional<util::thread> audioCaptureThread;
 
     std::unique_ptr<ui::window> sizingWindow;
     std::unique_ptr<ui::window> tooltipWindow;
     appui::sizing_config sizingConfig{fake};
     appui::tooltip_config tooltipConfig{fake};
 
+    auto setTestPattern = [&] {
+        videoCaptureThread.reset();
+        audioCaptureThread.reset();
+        updateLocked([&] {
+            // See screensetup.png.
+            size_t w = fake.width, h = fake.height, m = fake.musicLeds, s = w + h;
+            for (auto& strip : frameData)
+                std::fill(std::begin(strip), std::end(strip), 0xFF000000u);
+            frameData[0][0] = frameData[1][0] = 0xFF00FFFFu;
+            frameData[0][w] = frameData[0][w - 1] = 0xFFFFFF00u;
+            frameData[1][h] = frameData[1][h - 1] = 0xFFFF00FFu;
+            frameData[0][s - 1] = frameData[1][s - 1] = 0xFFFFFFFFu;
+            std::fill(frameData[2], frameData[2] + m / 2, 0xFFFFFF00u);
+            std::fill(frameData[3], frameData[3] + m / 2, 0xFF00FFFFu);
+            return true;
+        });
+    };
+
     sizingConfig.onDone.add([&] {
         if (sizingWindow)
             sizingWindow->close();
         mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
-        // TODO switch to actual colors
+        // TODO start video capture / set video color
+        audioCaptureThread.emplace(captureAudio);
     }).release();
     sizingConfig.onChange.add([&](int i, size_t value) {
-        // TODO 0 = width, 1 = height, 2 = music leds, 3 = serial port
+        switch (i) {
+            case 0: fake.width = value; break;
+            case 1: fake.height = value; break;
+            case 2: fake.musicLeds = value; break;
+            case 3: fake.serial = value; break;
+        }
+        if (i == 3) {
+            serialThread.reset();
+            serialThread.emplace(transmitData);
+        } else {
+            setTestPattern();
+        }
     }).release();
 
     tooltipConfig.setStatusMessage(L"Serial port offline");
@@ -468,16 +639,44 @@ int ui::main() {
         sizingWindow->setBackground(0xa0000000u, true);
         sizingWindow->setTopmost();
         sizingWindow->show();
-        // TODO switch to displaying the pattern shown in the icon
+        setTestPattern();
     }).release();
     tooltipConfig.onBrightness.add([&](int i, double v) {
-        // TODO 0 = video, 1 = audio
+        switch (i) {
+            case 0: fake.brightnessV = v; break;
+            case 1: fake.brightnessA = v; break;
+        }
+        // Ping the serial thread.
+        updateLocked([&]{ return true; });
     }).release();
     tooltipConfig.onGamma.add([&](int i, double v) {
-        // TODO 0 = gamma, 1..3 = rgb offsets
+        switch (i) {
+            case 0: fake.gamma = v; break;
+            case 1: fake.dr = v; break;
+            case 2: fake.dg = v; break;
+            case 3: fake.db = v; break;
+        }
+        updateLocked([&]{ return true; });
     }).release();
     tooltipConfig.onColor.add([&](uint32_t c) {
-        // TODO 0 = live, else ARGB
+        fake.color = c;
+        if (c & 0xFF000000) {
+            videoCaptureThread.reset();
+            updateLocked([&] {
+                size_t s = fake.width + fake.height;
+                std::fill(frameData[0], frameData[0] + s, c);
+                std::fill(frameData[1], frameData[1] + s, c);
+                return true;
+            });
+        } else {
+            // TODO enable the video capture thread instead
+            updateLocked([&] {
+                size_t s = fake.width + fake.height;
+                std::fill(frameData[0], frameData[0] + s, c);
+                std::fill(frameData[1], frameData[1] + s, c);
+                return true;
+            });
+        }
     }).release();
 
     mainWindow.onNotificationIcon.add([&](POINT p, bool primary) {

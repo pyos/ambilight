@@ -93,6 +93,8 @@
 
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="kiss_fft.c" />
+    <ClCompile Include="captureAudio.cpp" />
     <ClCompile Include="dxui/base.cpp" />
     <ClCompile Include="dxui/draw.cpp" />
     <ClCompile Include="dxui/resource.cpp" />
