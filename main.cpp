@@ -13,6 +13,20 @@
 #include <string>
 
 namespace appui {
+    struct state {
+        size_t width;
+        size_t height;
+        size_t musicLeds;
+        size_t serial;
+        double brightnessV;
+        double brightnessA;
+        double gamma;
+        double dr;
+        double dg;
+        double db;
+        uint32_t color;
+    };
+
     template <typename T>
     struct padded : T {
         template <typename... Args>
@@ -152,9 +166,9 @@ namespace appui {
     // |  Extra [-] ---|---------- [+] 3 |
     // | Serial [-] 3 [+]        [apply] |
     // +---------------------------------+
-    struct sizing_config : ui::grid {
-        sizing_config(size_t wv, size_t hv, size_t ev, size_t sn)
-            : ui::grid(1, 4)
+    struct sizing_config : padded<ui::grid> {
+        sizing_config(const state& init)
+            : padded<ui::grid>({20, 20}, 1, 4)
         {
             set(0, 0, &image);
             set(0, 1, &sliderGrid.pad);
@@ -166,14 +180,15 @@ namespace appui {
             sliderGrid.setColStretch(2, 1);
             bottomRow.set(5, 0, &done);
             bottomRow.setColStretch(4, 1);
-            w.setValue(wv);
-            h.setValue(hv);
-            e.setValue(ev);
-            s.setValue(sn);
+            w.setValue(init.width);
+            h.setValue(init.height);
+            e.setValue(init.musicLeds);
+            s.setValue(init.serial);
         }
 
     public:
-        util::event<size_t /* parameter */, size_t /* new value */> onChange;
+        // 0 = width, 1 = height, 2 = music leds, 3 = serial port
+        util::event<int /* parameter */, size_t /* new value */> onChange;
         util::event<> onDone;
 
     private:
@@ -233,19 +248,10 @@ namespace appui {
     struct s_slider : texslider { s_slider() : texslider({0,154,15,186}, {15,157,128,160}) {} };
     struct v_slider : texslider { v_slider() : texslider({0,154,15,186}, {15,160,128,163}) {} };
 
-    struct state {
-        double brightnessV;
-        double brightnessA;
-        double gamma;
-        double dr;
-        double dg;
-        double db;
-        uint32_t color;
-    };
-
     struct color_config_tab : gray_bg {
-        color_config_tab(const state& init)
+        color_config_tab(const state& init, util::event<int, double>& onChange)
             : gray_bg(grid.pad)
+            , onChange(onChange)
         {
             grid.set(0, 0, &gammaLabel.pad);
             grid.set(0, 1, &rOffLabel.pad);
@@ -262,9 +268,6 @@ namespace appui {
             bOffSlider.setValue(init.db);
         }
 
-    public:
-        util::event<int, double> onChange;
-
     private:
         padded<ui::grid> grid{{10, 20}, 2, 4};
         padded_label gammaLabel{{10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
@@ -275,6 +278,7 @@ namespace appui {
         padded<ui::slider> rOffSlider{{10, 10}};
         padded<ui::slider> gOffSlider{{10, 10}};
         padded<ui::slider> bOffSlider{{10, 10}};
+        util::event<int, double>& onChange;
         util::event<double>::handle gammaHandler = gammaSlider.onChange.add([this](double value) { return onChange(0, value * 2 + 1); });
         util::event<double>::handle rOffHandler = rOffSlider.onChange.add([this](double value) { return onChange(1, value); });
         util::event<double>::handle gOffHandler = gOffSlider.onChange.add([this](double value) { return onChange(2, value); });
@@ -340,9 +344,9 @@ namespace appui {
     };
 
     struct extra_tabs : ui::grid {
-        extra_tabs(const state& init)
+        extra_tabs(const state& init, util::event<int, double>& onGamma, util::event<uint32_t>& onColor)
             : ui::grid(1, 3)
-            , gammaTab(init)
+            , gammaTab(init, onGamma)
             , colorTab(init, onColor)
         {
             if (init.color >> 24)
@@ -355,14 +359,9 @@ namespace appui {
             setColStretch(0, 1);
         }
 
-    public:
-        util::event<int, double> onGamma;
-        util::event<uint32_t> onColor;
-
     private:
         color_config_tab gammaTab;
         color_select_tab colorTab;
-
         ui::grid buttons{2, 1};
         extra_button gammaButton{{L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         extra_button colorButton{{L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
@@ -373,15 +372,10 @@ namespace appui {
             return colorTab.emitEvent(); });
     };
 
-    // +------------------------------+
-    // | B -----|-------------------- |    (pretend those letters are icons signifying
-    // | M -----|-------------------- |     Brightness, Music, Settings, and Quit)
-    // |                      [S] [Q] |
-    // +------------------------------+
     struct tooltip_config : ui::grid {
         tooltip_config(const state& init)
             : ui::grid(1, 2)
-            , extraTabs(init)
+            , extraTabs(init, onGamma, onColor)
         {
             set(0, 0, &extraTabs);
             set(0, 1, &onTransparent.pad);
@@ -410,14 +404,15 @@ namespace appui {
         }
 
     public:
-        util::event<int, double> onBrightness;
+        util::event<int, double> onBrightness; // 0 = video, 1 = music
+        util::event<int, double> onGamma;      // 0 = gamma, 1..3 = rgb offsets
+        util::event<uint32_t> onColor;         // 0 = live, 0xFF?????? = constant
         util::event<> onSettings;
         util::event<> onQuit;
 
     private:
         extra_tabs extraTabs;
-
-        padded<ui::grid> onTransparent{{10, 20}, 1, 3};
+        padded<ui::grid> onTransparent{{10, 10}, 1, 3};
         padded<ui::grid> brightnessGrid{{10, 0}, 2, 2};
         padded_label bLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         padded_label mLabel{{10, 10}, {L"\uf001", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
@@ -442,19 +437,24 @@ int ui::main() {
     ui::window mainWindow{1, 1};
     mainWindow.onDestroy.add([&] { ui::quit(); }).release();
 
+    // TODO load from file
     const appui::state fake = {
-        0.7, 0.4, 2.0, 1.0, 1.0, 1.0, 0x00000000u
+        72, 40, 76, 3, 0.7, 0.4, 2.0, 1.0, 1.0, 1.0, 0x00000000u
     };
 
     std::unique_ptr<ui::window> sizingWindow;
     std::unique_ptr<ui::window> tooltipWindow;
-    appui::padded<appui::sizing_config> sizingConfig{{20, 20}, 72, 40, 76, 3};
+    appui::sizing_config sizingConfig{fake};
     appui::tooltip_config tooltipConfig{fake};
 
     sizingConfig.onDone.add([&] {
         if (sizingWindow)
             sizingWindow->close();
         mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
+        // TODO switch to actual colors
+    }).release();
+    sizingConfig.onChange.add([&](int i, size_t value) {
+        // TODO 0 = width, 1 = height, 2 = music leds, 3 = serial port
     }).release();
 
     tooltipConfig.setStatusMessage(L"Serial port offline");
@@ -468,6 +468,16 @@ int ui::main() {
         sizingWindow->setBackground(0xa0000000u, true);
         sizingWindow->setTopmost();
         sizingWindow->show();
+        // TODO switch to displaying the pattern shown in the icon
+    }).release();
+    tooltipConfig.onBrightness.add([&](int i, double v) {
+        // TODO 0 = video, 1 = audio
+    }).release();
+    tooltipConfig.onGamma.add([&](int i, double v) {
+        // TODO 0 = gamma, 1..3 = rgb offsets
+    }).release();
+    tooltipConfig.onColor.add([&](uint32_t c) {
+        // TODO 0 = live, else ARGB
     }).release();
 
     mainWindow.onNotificationIcon.add([&](POINT p, bool primary) {
@@ -503,7 +513,7 @@ int ui::main() {
         tooltipWindow->show();
     }).release();
 
-    if (false /*config not loaded*/) {
+    if (false /* TODO if config not loaded */) {
         tooltipConfig.onSettings();
     } else {
         sizingConfig.onDone();
