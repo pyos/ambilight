@@ -35,14 +35,16 @@ namespace ui {
         }
 
         bool onMouse(POINT abs, int keys) override {
-            if (!contents)
-                return false;
             auto [w, h] = size();
             auto [pl, pt, pr, pb] = getPadding();
-            if (!rectHit(RECT{pl, pt, w - pr, h - pb}, relative(abs)))
+            if (!rectHit(RECT{pl, pt, w - pr, h - pb}, relative(abs))) {
+                if (contents && forwardMouse)
+                    contents->onMouseLeave();
+                forwardMouse = false;
                 return false;
+            }
             forwardMouse = true;
-            return contents->onMouse(abs, keys);
+            return contents && contents->onMouse(abs, keys);
         }
 
         void onMouseLeave() override {
