@@ -186,6 +186,7 @@ namespace appui {
         padded_label doneLabel{{20, 0}, {L"Done", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}};
         padded<ui::grid> sliderGrid{{20, 0}, 5, 4};
         padded<ui::grid> bottomRow{{20, 20}, 6, 1};
+        ui::button done{doneLabel.pad};
         // The actual limit is 1 <= w + h <= LIMIT, but sliders jumping around
         // would probably be confusing.
         static constexpr size_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
@@ -193,7 +194,6 @@ namespace appui {
         controlled_number h{sliderGrid, 1, L"Screen height", 1, LIMIT, 1, true};
         controlled_number e{sliderGrid, 2, L"Music LEDs",    2, LIMIT, 2, true};
         controlled_number s{bottomRow,  0, L"Serial port",   1, 16,    1};
-        ui::button done{doneLabel.pad};
         // A hacky way to set a constant size for the number labels:
         ui::spacer constNumWidth{{60, 1}};
 
@@ -204,37 +204,28 @@ namespace appui {
         util::event<>::handle doneHandler = done.onClick.add([this]{ return onDone(); });
     };
 
+    template <int i>
     struct texslider : ui::slider {
-        texslider(RECT track, RECT groove) : track(track), groove(groove) {}
-    private:
+    protected:
         winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
             return ctx.cachedTexture<extraWidgets>(); }
-        RECT getTrack() const override { return track; }
-        RECT getGroove() const override { return groove; }
-        RECT track, groove;
+        RECT getTrack() const override { return {0, 154, 15, 186}; }
+        RECT getGroove() const override { return {15, 154 + 3 * i, 128, 157 + 3 * i}; }
     };
 
     struct gray_bg : ui::texrect {
-        using ui::texrect::texrect;
-
         void setTransparent(bool value) {
             transparent = value;
             invalidate();
         }
 
     protected:
-        static winapi::com_ptr<ID3D11Texture2D> grayPixel(ui::dxcontext& ctx) {
-            return ctx.textureFromRaw({64, 64, 64, 64, 0, 0, 0, 0}, 2, false); }
         winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
-            return ctx.cachedTexture<grayPixel>(); }
-        RECT getOuter() const override { return {transparent, 0, transparent + 1, 1}; }
-        RECT getInner() const override { return {transparent, 0, transparent + 1, 1}; }
+            return ctx.cachedTexture<extraWidgets>(); }
+        RECT getOuter() const override { return {15 + transparent, 163, 16 + transparent, 164}; }
+        RECT getInner() const override { return getOuter(); }
         bool transparent = false;
     };
-
-    struct h_slider : texslider { h_slider() : texslider({0,154,15,186}, {15,154,128,157}) {} };
-    struct s_slider : texslider { s_slider() : texslider({0,154,15,186}, {15,157,128,160}) {} };
-    struct v_slider : texslider { v_slider() : texslider({0,154,15,186}, {15,160,128,163}) {} };
 
     struct color_config_tab : gray_bg {
         color_config_tab(const state& init, util::event<int, double>& onChange)
@@ -294,8 +285,8 @@ namespace appui {
         util::event<uint32_t>& onChange;
     private:
         padded<ui::grid> grid{{10, 10}, 1, 2};
-        padded<h_slider> hueSlider{{10, 10}};
-        padded<s_slider> satSlider{{10, 10}};
+        padded<texslider<0>> hueSlider{{10, 10}};
+        padded<texslider<1>> satSlider{{10, 10}};
         util::event<double>::handle hueHandler = hueSlider.onChange.add([this](double) { return onChange(value()); });
         util::event<double>::handle satHandler = satSlider.onChange.add([this](double) { return onChange(value()); });
     };
@@ -404,8 +395,8 @@ namespace appui {
         padded<ui::grid> brightnessGrid{{10, 0}, 2, 2};
         padded_label bLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         padded_label mLabel{{10, 10}, {L"\uf001", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        padded<v_slider> bSlider{{10, 10}};
-        padded<v_slider> mSlider{{10, 10}};
+        padded<texslider<2>> bSlider{{10, 10}};
+        padded<texslider<2>> mSlider{{10, 10}};
 
         padded<ui::grid> bottomRow{{10, 0}, 3, 1};
         padded_label statusText{{10, 10}, {L"", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 18, 0x80FFFFFFu}};
