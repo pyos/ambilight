@@ -89,7 +89,7 @@ namespace ui {
         }
 
         // Schedule redrawing of the entire window.
-        void draw() { draw({0, 0, (LONG)w, (LONG)h}); }
+        void draw() { draw({0, 0, size.x, size.y}); }
 
         // Schedule redrawing of a region.
         void draw(RECT);
@@ -157,13 +157,12 @@ namespace ui {
         std::unique_ptr<NOTIFYICONDATA, release_notify_icon> notifyIcon;
         gravity hGravity = gravity_start;
         gravity vGravity = gravity_start;
-        UINT w = 1;
-        UINT h = 1;
+        POINT size = {1, 1};
+        POINT dragBy = {-1, -1};
         RECT lastPainted = {0, 0, 0, 0};
         uint32_t background = 0xFFFFFFFFu;
         bool mouseInBounds = false;
         bool dragByEmptyAreas = true;
-        POINT dragBy = {-1, -1};
     };
 
     namespace impl {

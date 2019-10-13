@@ -89,7 +89,7 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
             break;
         case WM_CLOSE:
             if (window->onClose())
-                return TRUE;
+                return 0;
             break;
         case WM_DESTROY:
             window->onDestroy();
@@ -171,7 +171,7 @@ ui::window::window(int w, int h, int x, int y, window* parent) {
     // Apparently the easiest way to render a transparent texture onto a window,
     // as non-undefined AlphaMode is only allowed for CreateSwapChainForComposition.
     device = COMv(IDCompositionDevice, DCompositionCreateDevice, dxgiDevice);
-    target = COMe(IDCompositionTarget, device->CreateTargetForHwnd, *this, TRUE);
+    target = COMe(IDCompositionTarget, device->CreateTargetForHwnd, *this, FALSE);
     winapi::throwOnFalse(device->CreateVisual(&visual));
     winapi::throwOnFalse(visual->SetContent(swapChain.get()));
     winapi::throwOnFalse(target->SetRoot(visual));
@@ -201,14 +201,13 @@ void ui::window::drawImmediate(RECT scheduled) {
         }
     }
 
-    if (w != rect.right - rect.left || h != rect.bottom - rect.top) {
+    if (size.x != rect.right - rect.left || size.y != rect.bottom - rect.top) {
         // Fit the swapchain buffer to window size.
-        w = std::max(rect.right - rect.left, 1L);
-        h = std::max(rect.bottom - rect.top, 1L);
+        auto [w, h] = size = {std::max(rect.right - rect.left, 1L), std::max(rect.bottom - rect.top, 1L)};
         DXGI_SWAP_CHAIN_DESC swapChainDesc;
         swapChain->GetDesc(&swapChainDesc);
         winapi::throwOnFalse(swapChain->ResizeBuffers(swapChainDesc.BufferCount, w, h, swapChainDesc.BufferDesc.Format, swapChainDesc.Flags));
-        scheduled = {0, 0, (LONG)w, (LONG)h};
+        scheduled = {0, 0, w, h};
     }
 
     auto target = COMv(ID3D11Texture2D, swapChain->GetBuffer, 0);
@@ -218,10 +217,10 @@ void ui::window::drawImmediate(RECT scheduled) {
         //
         // TODO copy from the other buffer directly somehow
         context.clear(target, lastPainted, background);
-        if (root) root->draw(context, target, {0, 0, (LONG)w, (LONG)h}, lastPainted);
+        if (root) root->draw(context, target, {0, 0, size.x, size.y}, lastPainted);
     }
     context.clear(target, scheduled, background);
-    if (root) root->draw(context, target, {0, 0, (LONG)w, (LONG)h}, scheduled);
+    if (root) root->draw(context, target, {0, 0, size.x, size.y}, scheduled);
     lastPainted = scheduled;
     winapi::throwOnFalse(swapChain->Present(1, 0));
 }
