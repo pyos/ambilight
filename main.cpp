@@ -181,11 +181,11 @@ namespace appui {
 
     private:
         screensetup image;
-        padded_label helpLabel{{35, 20}, {L"Tweak the values until you get the pattern shown above.",
+        padded_label helpLabel{{20, 20}, {L"Tweak the values until you get the pattern shown above.",
                                           ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 22}};
         padded_label doneLabel{{20, 0}, {L"Done", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}};
         padded<ui::grid> sliderGrid{{20, 0}, 5, 4};
-        padded<ui::grid> bottomRow{{35, 20}, 6, 1};
+        padded<ui::grid> bottomRow{{20, 20}, 6, 1};
         // The actual limit is 1 <= w + h <= LIMIT, but sliders jumping around
         // would probably be confusing.
         static constexpr size_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
@@ -257,11 +257,11 @@ namespace appui {
         }
 
     private:
-        padded<ui::grid> grid{{10, 20}, 2, 4};
+        padded<ui::grid> grid{{10, 10}, 2, 4};
         padded_label gammaLabel{{10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        padded_label rOffLabel{{10, 10}, {L"R", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}};
-        padded_label gOffLabel{{10, 10}, {L"G", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}};
-        padded_label bOffLabel{{10, 10}, {L"B", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}};
+        padded_label rOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 18, 0xFFFF3333u}};
+        padded_label gOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 18, 0xFF33FF33u}};
+        padded_label bOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 18, 0xFF3333FFu}};
         padded<ui::slider> gammaSlider{{10, 10}};
         padded<ui::slider> rOffSlider{{10, 10}};
         padded<ui::slider> gOffSlider{{10, 10}};
@@ -278,11 +278,9 @@ namespace appui {
             : onChange(onChange)
         {
             setContents(&grid.pad);
-            grid.set(0, 0, &hueLabel.pad, ui::grid::align_end);
-            grid.set(1, 0, &hueSlider.pad);
-            grid.set(0, 1, &satLabel.pad, ui::grid::align_end);
-            grid.set(1, 1, &satSlider.pad);
-            grid.setColStretch(1, 1);
+            grid.set(0, 0, &hueSlider.pad);
+            grid.set(0, 1, &satSlider.pad);
+            grid.setColStretch(0, 1);
             auto [a, h, s, v] = argb2ahsv(u2qd(init.color));
             hueSlider.setValue(h);
             satSlider.setValue(s);
@@ -295,9 +293,7 @@ namespace appui {
     public:
         util::event<uint32_t>& onChange;
     private:
-        padded<ui::grid> grid{{10, 20}, 2, 2};
-        padded_label hueLabel{{10, 10}, {L"Hue", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}};
-        padded_label satLabel{{10, 10}, {L"Saturation", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}};
+        padded<ui::grid> grid{{10, 10}, 1, 2};
         padded<h_slider> hueSlider{{10, 10}};
         padded<s_slider> satSlider{{10, 10}};
         util::event<double>::handle hueHandler = hueSlider.onChange.add([this](double) { return onChange(value()); });
