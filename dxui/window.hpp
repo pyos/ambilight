@@ -32,10 +32,10 @@ namespace ui {
         operator HWND() const { return handle.get(); }
 
         // Show this window. If it is visible and maximized, restore it to the original size.
-        void show() {
-            drawImmediate({0, 0, (LONG)w, (LONG)h});
-            ShowWindow(*this, SW_SHOWNORMAL);
-        }
+        void show() { ShowWindow(*this, SW_SHOWNORMAL); }
+
+        // Enable or disable shadow and the accent border under this window.
+        void setShadow(bool value = true);
 
         // Make it float on top of everything else.
         void setTopmost(bool permanently = false) {

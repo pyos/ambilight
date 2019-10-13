@@ -630,7 +630,7 @@ int ui::main() {
         sizingWindow = std::make_unique<ui::window>(800, 800, (w - 800) / 2, (h - 800) / 2);
         sizingWindow->setRoot(&sizingConfig.pad);
         sizingWindow->setBackground(0xa0000000u, true);
-        sizingWindow->setTopmost();
+        sizingWindow->setShadow(true);
         sizingWindow->show();
         setTestPattern();
     }).release();

@@ -152,8 +152,6 @@ ui::window::window(int w, int h, int x, int y, window* parent) {
         w, h, parent ? parent->handle.get() : nullptr, nullptr, impl::hInstance, nullptr));
     winapi::throwOnFalse(handle);
     SetWindowLongPtr(*this, GWLP_USERDATA, (LONG_PTR)this);
-    MARGINS m = {1, 1, 1, 1};
-    DwmExtendFrameIntoClientArea(*this, &m);
     // Request a WM_NCCALCSIZE so that Windows knows we don't want a frame.
     SetWindowPos(*this, HWND_NOTOPMOST, 0, 0, w, h, SWP_DRAWFRAME|SWP_NOMOVE);
 
@@ -178,6 +176,11 @@ ui::window::window(int w, int h, int x, int y, window* parent) {
     winapi::throwOnFalse(visual->SetContent(swapChain.get()));
     winapi::throwOnFalse(target->SetRoot(visual));
     winapi::throwOnFalse(device->Commit());
+}
+
+void ui::window::setShadow(bool value) {
+    MARGINS m = {value, value, value, value};
+    DwmExtendFrameIntoClientArea(*this, &m);
 }
 
 void ui::window::draw(RECT dirty) {
