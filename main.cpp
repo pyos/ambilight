@@ -482,7 +482,7 @@ int ui::main() {
             // bottom right -> bottom left -> top left; bottom right -> top right -> top left
             for (auto x = w; x--; ) W_PX(h - 1, x);
             for (auto y = h; y--; ) W_PX(y, 0);
-            for (auto y = h; y--; ) W_PX(y, h - 1);
+            for (auto y = h; y--; ) W_PX(y, w - 1);
             for (auto x = w; x--; ) W_PX(0, x);
 #undef W_PX
             updateFrom(data.data(), data.data() + w + h, nullptr, nullptr, w, h, 0);
