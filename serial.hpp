@@ -34,9 +34,9 @@ struct serial {
         winapi::throwOnFalse(PurgeComm(handle.get(), PURGE_RXCLEAR | PURGE_TXCLEAR));
     }
 
-    void update(uint8_t strip, util::span<const UINT> data, float g, float b, float oG, float oB) {
+    void update(uint8_t strip, util::span<const UINT> data, double gamma, double brightness) {
         for (size_t i = 0; i < data.size(); i++) {
-            auto n = LED(data[i]).applyGamma(g, b);
+            auto n = LED(data[i]).applyGamma(gamma, brightness);
             size_t chunk = i / AMBILIGHT_SERIAL_CHUNK;
             size_t place = i % AMBILIGHT_SERIAL_CHUNK;
             valid[strip][chunk] &= n == color[strip][chunk][place];

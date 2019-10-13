@@ -326,8 +326,10 @@ namespace appui {
             , gammaTab(init, onGamma)
             , colorTab(init, onColor)
         {
-            if (init.color >> 24)
+            if (init.color >> 24) {
+                set(0, 1, &colorTab);
                 colorButton.setState(true);
+            }
             buttons.set(0, 0, &gammaButton);
             buttons.set(1, 0, &colorButton);
             buttons.setColStretch(0, 1);
@@ -425,14 +427,9 @@ int ui::main() {
         return [&, f = std::move(f)](std::atomic<bool>& terminate) {
             while (!terminate) try {
                 f(terminate);
-            } catch (const std::exception /*util::retry*/&) {
+            } catch (const std::exception&) {
                 Sleep(500);
-            } /*catch (const util::fatal& err) {
-                std::lock_guard<std::mutex> lock(mut);
-                unexpectedErrorText = err.msg;
-                PostMessage(window, ID_MESSAGE_FATAL_ERROR, 0, 0);
-                return;
-            }*/
+            }
         };
     };
 
@@ -483,19 +480,14 @@ int ui::main() {
             auto out = data.data();
 #define W_PX(y, x) do { *out++ = in[(y) * w + (x)]; } while (0)
             // bottom right -> bottom left -> top left; bottom right -> top right -> top left
-            for (UINT x = w; x--; ) W_PX(h - 1, x);
-            for (UINT y = h; y--; ) W_PX(y, 0);
-            for (UINT y = h; y--; ) W_PX(y, h - 1);
-            for (UINT x = w; x--; ) W_PX(0, x);
+            for (auto x = w; x--; ) W_PX(h - 1, x);
+            for (auto y = h; y--; ) W_PX(y, 0);
+            for (auto y = h; y--; ) W_PX(y, h - 1);
+            for (auto x = w; x--; ) W_PX(0, x);
 #undef W_PX
             updateFrom(data.data(), data.data() + w + h, nullptr, nullptr, w, h, 0);
         }
     });
-
-// Coefficients for ensuring uniformity of the spectrum. Each octave's power
-// is divided by e^(Mx) / N, where x = the index of that octave from the end.
-#define DFT_EQUALIZER_M 0.55f
-#define DFT_EQUALIZER_N 0.12f
 
     auto captureAudio = loopThread([&](std::atomic<bool>& terminate) {
         double lastH = 0;
@@ -514,7 +506,8 @@ int ui::main() {
             size_t i = 0, j = 0;
             for (size_t lim : {data.size() / 2, data.size()}) {
                 for (size_t k = in.size() / 2; k--; j++)
-                    for (size_t w = tanh(in[j] / exp((k + 1) * DFT_EQUALIZER_M) / DFT_EQUALIZER_N) * (lim - i); w--; )
+                    // Yay, hardcoded coefficients!
+                    for (size_t w = (size_t)(tanh(in[j] / exp((k + 1) * 0.55) / 0.12) * (lim - i)); w--; )
                         data[i++] = 0xFF000000u | (delta * (k + 1));
                 while (i < lim)
                     data[i++] = 0xFF000000u;
@@ -531,12 +524,9 @@ int ui::main() {
                 // Ping the arduino at least once per ~1.6s so that it knows the app is still running.
                 if (iter % 16 && !frameEv.wait_for(lock, std::chrono::milliseconds(100), [&]{ return frameDirty; }))
                     continue;
-                const size_t w = fake.width, h = fake.height, m = fake.musicLeds;
-                const size_t lengths[4] = {w + h, w + h, m / 2, m / 2};
-                for (size_t i = 0, strip = 0; strip < 4; i += lengths[strip++])
-                    // TODO color offsets
-                    comm.update((uint8_t)strip, frameData[strip],
-                        (float)fake.gamma, (float)(strip < 2 ? fake.brightnessV : fake.brightnessA), 0, 0);
+                // TODO color offsets
+                for (uint8_t strip = 0; strip < 4; strip++)
+                    comm.update(strip, frameData[strip], fake.gamma, strip < 2 ? fake.brightnessV : fake.brightnessA);
                 frameDirty = false;
             }
             comm.submit();

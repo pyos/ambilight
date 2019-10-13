@@ -33,15 +33,15 @@ namespace {
         LED(uint8_t r, uint8_t g, uint8_t b) : G(g), R(r), B(b) {} // Convert here.
 
 #ifdef AMBILIGHT_PC
-        LED applyGamma(float gamma, float brightness) {
+        LED applyGamma(double gamma, double brightness) {
             // Naively applying round((x * brightness / 255) ^ gamma * 255) for each component
             // can multiply relative differences due to rounding errors, e.g. 16, 17, 16 (barely
             // greenish dark gray) at gamma 2.0 and brightness = 70% will become 0, 1, 0 (obvious
             // dark green). To avoid this, round the differences instead.
-            float g = powf(G * brightness / 255, gamma);
-            float r = powf(R * brightness / 255, gamma) - g;
-            float b = powf(B * brightness / 255, gamma) - g;
-            return LED(roundf(r * 255) + roundf(g * 255), roundf(g * 255), roundf(b * 255) + roundf(g * 255));
+            double g = pow(G * brightness / 255, gamma);
+            double r = pow(R * brightness / 255, gamma) - g;
+            double b = pow(B * brightness / 255, gamma) - g;
+            return LED(round(r * 255) + round(g * 255), round(g * 255), round(b * 255) + round(g * 255));
         }
 #endif
 
