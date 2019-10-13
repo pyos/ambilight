@@ -60,13 +60,13 @@ namespace ui {
             return {i.left - o.left, i.top - o.top, o.right - i.right, o.bottom - i.bottom};
         }
 
-        POINT measureMinImpl() const {
+        POINT measureMinImpl() const override {
             auto [pl, pt, pr, pb] = getPadding();
             auto [w, h] = contents ? contents->measureMin() : POINT{0, 0};
             return {w + pl + pr, h + pt + pb};
         }
 
-        POINT measureImpl(POINT fit) const {
+        POINT measureImpl(POINT fit) const override {
             auto [pl, pt, pr, pb] = getPadding();
             auto [w, h] = contents ? contents->measure({fit.x - pl - pr, fit.y - pt - pb}) : POINT{0, 0};
             return {w + pl + pr, h + pt + pb};
