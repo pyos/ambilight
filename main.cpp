@@ -57,74 +57,52 @@ namespace appui {
     };
 
     // name [-] N [+]
+    // name [-] ---|----------- [+] N
     struct controlled_number {
         controlled_number(ui::grid& grid, size_t row, util::span<const wchar_t> name,
-                          size_t min, size_t max, size_t step)
-            : label({15, 15}, {name, ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()})
-            , min(min)
-            , max(max)
-            , step(step)
+                          size_t min, size_t max, size_t step, bool useSlider = false)
+            : min(min), max(max), step(step)
         {
-            grid.set(0, row, &label.pad, ui::grid::align_end);
+            label.modText([&](auto& chunks) { chunks[0].data = name; });
+            grid.set(0, row, &label, ui::grid::align_end);
             grid.set(1, row, &decButton);
-            grid.set(2, row, &numLabel);
+            if (useSlider) {
+                grid.set(2, row, &slider);
+                grid.set(4, row, &numLabel);
+            } else {
+                grid.set(2, row, &numLabel);
+            }
             grid.set(3, row, &incButton);
-            // Initialize the label.
             decButton.setBorderless(true);
             incButton.setBorderless(true);
         }
 
-        size_t getValue() const {
-            return value;
-        }
-
-        virtual void setValue(size_t v) {
-            value = std::max(std::min(v - v % step, max), min);
-            numBuffer = std::to_wstring(value);
-            numLabel.setText({{numBuffer, ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}});
-            onChange(value);
+        bool setValue(size_t v) {
+            slider.setValue(v, min, max, step);
+            numBuffer = std::to_wstring(v);
+            numLabel.modText([&](auto& chunks) { chunks[0].data = numBuffer; });
+            return onChange(v);
         }
 
     public:
         util::event<size_t> onChange;
 
-    protected:
-        size_t min;
-        size_t max;
-        size_t step;
-        size_t value = 0;
-    protected:
+    private:
+        size_t min, max, step;
+        ui::label label{{{L"", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
+        ui::label numLabel{{{L"", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
         ui::label decLabel{{{L"\uf068", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
         ui::label incLabel{{{L"\uf067", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
-        padded_label label;
-        ui::label numLabel{{}};
         ui::button decButton{decLabel};
         ui::button incButton{incLabel};
-    private:
-        util::event<>::handle decHandler = decButton.onClick.add([this]{ setValue(value - step); });
-        util::event<>::handle incHandler = incButton.onClick.add([this]{ setValue(value + step); });
+        ui::slider slider;
+        util::event<>::handle m1 = decButton.onClick.add([this]{
+            return setValue(slider.mapValue(min, max, step) - step); });
+        util::event<>::handle p1 = incButton.onClick.add([this]{
+            return setValue(slider.mapValue(min, max, step) + step); });
+        util::event<double>::handle sv = slider.onChange.add([this](double) {
+            return setValue(slider.mapValue(min, max, step)); });
         std::wstring numBuffer;
-    };
-
-    // name [-] ---|----------- [+] 123
-    struct controlled_slider : controlled_number {
-        controlled_slider(ui::grid& grid, size_t row, util::span<const wchar_t> name,
-                          size_t min, size_t max, size_t step)
-            : controlled_number(grid, row, name, min, max, step)
-        {
-            grid.set(2, row, &slider.pad);
-            grid.set(4, row, &numLabel);
-        }
-
-        void setValue(size_t v) override {
-            slider.setValue(v, min, max, step);
-            controlled_number::setValue(v);
-        }
-
-    private:
-        padded<ui::slider> slider{{10, 15}};
-        util::event<double>::handle sliderHandler = slider.onChange.add([this](double) {
-            setValue(slider.mapValue(min, max, step)); });
     };
 
     static winapi::com_ptr<ID3D11Texture2D> extraWidgets(ui::dxcontext& ctx) {
@@ -183,10 +161,9 @@ namespace appui {
         {
             set(0, 0, &image);
             set(0, 1, &sliderGrid.pad);
-            set(0, 2, &help.pad);
+            set(0, 2, &helpLabel.pad);
             set(0, 3, &bottomRow.pad);
-            setRowStretch(0, 1);
-            setColStretch(0, 1);
+            setPrimaryCell(0, 0);
             sliderGrid.set(4, 3, &constNumWidth);
             sliderGrid.setColStretch(2, 1);
             bottomRow.set(5, 0, &done);
@@ -203,22 +180,22 @@ namespace appui {
         util::event<> onDone;
 
     private:
-        static constexpr size_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
         screensetup image;
-        padded_label help{{35, 20}, {L"Tweak the values until you get the pattern shown above.",
-                                     ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 22}};
+        padded_label helpLabel{{35, 20}, {L"Tweak the values until you get the pattern shown above.",
+                                          ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 22}};
+        padded_label doneLabel{{20, 0}, {L"Done", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}};
         padded<ui::grid> sliderGrid{{20, 0}, 5, 4};
         padded<ui::grid> bottomRow{{35, 20}, 6, 1};
         // The actual limit is 1 <= w + h <= LIMIT, but sliders jumping around
         // would probably be confusing.
-        controlled_slider w{sliderGrid, 0, L"Screen width",  1, LIMIT, 1};
-        controlled_slider h{sliderGrid, 1, L"Screen height", 1, LIMIT, 1};
-        controlled_slider e{sliderGrid, 2, L"Music LEDs",    2, LIMIT, 2};
+        static constexpr size_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
+        controlled_number w{sliderGrid, 0, L"Screen width",  1, LIMIT, 1, true};
+        controlled_number h{sliderGrid, 1, L"Screen height", 1, LIMIT, 1, true};
+        controlled_number e{sliderGrid, 2, L"Music LEDs",    2, LIMIT, 2, true};
         controlled_number s{bottomRow,  0, L"Serial port",   1, 16,    1};
+        ui::button done{doneLabel.pad};
         // A hacky way to set a constant size for the number labels:
         ui::spacer constNumWidth{{60, 1}};
-        padded_label doneLabel{{20, 0}, {L"Done", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}};
-        ui::button done{doneLabel.pad};
 
         util::event<size_t>::handle wHandler = w.onChange.add([this](size_t v) { return onChange(0, v); });
         util::event<size_t>::handle hHandler = h.onChange.add([this](size_t v) { return onChange(1, v); });
@@ -415,7 +392,7 @@ namespace appui {
         }
 
         void setStatusMessage(util::span<const wchar_t> msg) {
-            statusText.setText({{msg, ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 18, 0x80FFFFFFu}});
+            statusText.modText([&](auto& chunks) { chunks[0].data = msg; });
         }
 
     public:
@@ -435,7 +412,7 @@ namespace appui {
         padded<v_slider> mSlider{{10, 10}};
 
         padded<ui::grid> bottomRow{{10, 0}, 3, 1};
-        padded<ui::label> statusText{{10, 10}};
+        padded_label statusText{{10, 10}, {L"", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 18, 0x80FFFFFFu}};
         ui::label sLabel{{{L"\uf013", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
         ui::label qLabel{{{L"\uf011", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
         padded<ui::button> sButton{{10, 10}, sLabel};
