@@ -144,10 +144,11 @@ struct ScreenCapturer : IVideoCapturer {
         };
         ui::vertex vs2[] = {QUADP(0, 0, dst.right, dst.bottom, 0, 0, 0, dst.right, dst.bottom)};
         ui::vertex vs3[] = {QUADP(0, 0, dst.right, dst.bottom, 0, 0, 0, dst.right, dst.bottom)};
+        for (auto& w : vs3) w.blw = 1;
         res.regenerateMipMaps(complete);
         res.draw(rescaled1, complete, {&vs[6 * (rotate * 2 + mirror)], 6}, dst);
-        res.draw(rescaled2, rescaled1, vs2, dst, ui::dxcontext::blurH);
-        res.draw(rescaled1, rescaled2, vs3, dst, ui::dxcontext::blurV);
+        res.draw(rescaled2, rescaled1, vs2, dst, ui::dxcontext::blur);
+        res.draw(rescaled1, rescaled2, vs3, dst, ui::dxcontext::blur);
         res.copy(cpuReadTarget, rescaled1, dst);
 
         auto readSurface = COMi(IDXGISurface, cpuReadTarget->QueryInterface);

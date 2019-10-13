@@ -10,8 +10,7 @@
 #include <dxui/shaders/id_vertex.h>
 #include <dxui/shaders/id_pixel.h>
 #include <dxui/shaders/distance_color.h>
-#include <dxui/shaders/blurX.h>
-#include <dxui/shaders/blurY.h>
+#include <dxui/shaders/blur.h>
 
 ui::dxcontext::dxcontext() {
     D3D_FEATURE_LEVEL level;
@@ -37,9 +36,8 @@ ui::dxcontext::dxcontext() {
     };
     vertexId = COMe(ID3D11VertexShader, device->CreateVertexShader, g_id_vertex, ARRAYSIZE(g_id_vertex), nullptr);
     pixelId = COMe(ID3D11PixelShader, device->CreatePixelShader, g_id_pixel, ARRAYSIZE(g_id_pixel), nullptr);
+    pixelBlur = COMe(ID3D11PixelShader, device->CreatePixelShader, g_blur, ARRAYSIZE(g_blur), nullptr);
     colorDistance = COMe(ID3D11PixelShader, device->CreatePixelShader, g_distance_color, ARRAYSIZE(g_distance_color), nullptr);
-    blurX = COMe(ID3D11PixelShader, device->CreatePixelShader, g_blurX, ARRAYSIZE(g_blurX), nullptr);
-    blurY = COMe(ID3D11PixelShader, device->CreatePixelShader, g_blurY, ARRAYSIZE(g_blurY), nullptr);
     inputLayout = COMe(ID3D11InputLayout, device->CreateInputLayout, layout, ARRAYSIZE(layout), g_id_vertex, ARRAYSIZE(g_id_vertex));
     context->IASetInputLayout(inputLayout);
 
@@ -132,8 +130,7 @@ void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util:
     context->RSSetViewports(1, &vp);
     context->RSSetScissorRects(1, &cull);
     context->PSSetShader(mode == distanceCoded ? colorDistance
-                       : mode == blurH ? blurX
-                       : mode == blurV ? blurY
+                       : mode == blur ? pixelBlur
                        : pixelId, nullptr, 0);
     context->OMSetBlendState(blendOver, nullptr, 0xFFFFFFFFU);
     context->OMSetRenderTargets(1, &rt, nullptr);

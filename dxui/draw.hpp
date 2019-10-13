@@ -107,7 +107,7 @@ namespace ui {
         // Clear a region of a texture, setting all pixels in it to the specified ARGB color.
         void clear(ID3D11Texture2D* target, RECT, uint32_t color = 0);
 
-        enum mode { normal, distanceCoded, blurH, blurV };
+        enum mode { normal, distanceCoded, blur };
 
         // Draw a textured object onto a surface. Vertex coordinates must be given in pixels;
         // calling this function will transform them into UV.
@@ -152,9 +152,8 @@ namespace ui {
         winapi::com_ptr<ID3D11DeviceContext> context;
         winapi::com_ptr<ID3D11VertexShader> vertexId;
         winapi::com_ptr<ID3D11PixelShader> pixelId;
+        winapi::com_ptr<ID3D11PixelShader> pixelBlur;
         winapi::com_ptr<ID3D11PixelShader> colorDistance;
-        winapi::com_ptr<ID3D11PixelShader> blurX;
-        winapi::com_ptr<ID3D11PixelShader> blurY;
         winapi::com_ptr<ID3D11InputLayout> inputLayout;
         winapi::com_ptr<ID3D11SamplerState> linear;
         winapi::com_ptr<ID3D11BlendState> blendOver;
