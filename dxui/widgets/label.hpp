@@ -74,19 +74,18 @@ namespace ui {
             , lineHeight(1.3)
         {}
 
-        template <typename Container>
-        void setText(Container&& updated) {
-            data.assign(std::begin(updated), std::end(updated));
-            invalidateSize();
-        }
-
-        void setText(std::initializer_list<text_part> updated) {
-            data.assign(std::begin(updated), std::end(updated));
-            invalidateSize();
+        template <typename C = std::initializer_list<text_part>>
+        void setText(C&& updated) {
+            modText([&](auto& v) { v.assign(std::begin(updated), std::end(updated)); });
         }
 
         void setText(std::vector<text_part>&& updated) {
-            data = std::move(updated);
+            modText([&](auto& v) { v = std::move(updated); });
+        }
+
+        template <typename F /* = void(std::vector<text_part>&) */>
+        void modText(F&& f) {
+            f(data);
             invalidateSize();
         }
 
