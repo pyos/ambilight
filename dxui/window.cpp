@@ -81,21 +81,18 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
     auto window = reinterpret_cast<ui::window*>(GetWindowLongPtr(handle, GWLP_USERDATA));
     if (window) switch (msg) {
         case WM_SHOWWINDOW:
-            if (!(wParam ? window->onShow : window->onHide)(lParam))
-                return TRUE;
-            break;
+            (wParam ? window->onShow : window->onHide)(lParam);
+            break; // NOTE: returning 0 cancels
         case WM_SIZE:
             window->draw();
-            if (!window->onResize())
-                return TRUE;
+            window->onResize();
             break;
         case WM_CLOSE:
-            if (!window->onClose())
+            if (window->onClose())
                 return TRUE;
             break;
         case WM_DESTROY:
-            if (!window->onDestroy())
-                return TRUE;
+            window->onDestroy();
             break;
         case WM_GETMINMAXINFO:
             if (auto root = window->getRoot())
@@ -140,12 +137,10 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
         case WM_USER: switch (LOWORD(lParam)) {
             case NIN_SELECT:
             case NIN_KEYSELECT:
-                if (!window->onNotificationIcon(POINT{GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam)}, true))
-                    return 0;
+                window->onNotificationIcon(POINT{GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam)}, true);
                 break;
             case WM_CONTEXTMENU:
-                if (!window->onNotificationIcon(POINT{GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam)}, false))
-                    return 0;
+                window->onNotificationIcon(POINT{GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam)}, false);
                 break;
         }
     }

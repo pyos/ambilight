@@ -13,9 +13,9 @@ namespace util {
         template <typename... Args>
         bool operator()(Args&&... args) {
             for (auto& f : callbacks)
-                if (!f(args...))
-                    return false;
-            return true;
+                if (f(args...))
+                    return true;
+            return false;
         }
 
         struct unsubscribe {
@@ -31,7 +31,7 @@ namespace util {
         template <typename F /* = bool(ArgTypes...) or void(ArgTypes...) */>
         handle add(F&& cb) {
             if constexpr (std::is_same_v<std::invoke_result_t<F, ArgTypes...>, void>)
-                callbacks.emplace_back([cb = std::forward<F>(cb)](ArgTypes... args) { cb(args...); return true; });
+                callbacks.emplace_back([cb = std::forward<F>(cb)](ArgTypes... args) { cb(args...); return false; });
             else
                 callbacks.emplace_back(std::forward<F>(cb));
             auto it = callbacks.end();
