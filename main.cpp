@@ -14,14 +14,13 @@
 
 #include "capture.h"
 #include "color.hpp"
+#include "defer.hpp"
 #include "serial.hpp"
-#include "thread.hpp"
 
 #include <atomic>
 #include <string>
 #include <condition_variable>
 #include <mutex>
-#include <optional>
 
 namespace appui {
     struct state {
@@ -65,14 +64,14 @@ namespace appui {
         {
             label.modText([&](auto& chunks) { chunks[0].data = name; });
             grid.set(0, row, &label, ui::grid::align_end);
-            grid.set(1, row, &decButton);
+            grid.set(1, row, &decButton.pad);
             if (useSlider) {
                 grid.set(2, row, &slider);
                 grid.set(4, row, &numLabel);
             } else {
                 grid.set(2, row, &numLabel);
             }
-            grid.set(3, row, &incButton);
+            grid.set(3, row, &incButton.pad);
             decButton.setBorderless(true);
             incButton.setBorderless(true);
         }
@@ -93,8 +92,8 @@ namespace appui {
         ui::label numLabel{{{L"", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
         ui::label decLabel{{{L"\uf068", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
         ui::label incLabel{{{L"\uf067", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
-        ui::button decButton{decLabel};
-        ui::button incButton{incLabel};
+        padded<ui::button> decButton{{5, 0}, decLabel};
+        padded<ui::button> incButton{{5, 0}, incLabel};
         ui::slider slider;
         util::event<>::handle m1 = decButton.onClick.add([this]{
             return setValue(slider.mapValue(min, max, step) - step); });
@@ -417,84 +416,100 @@ namespace appui {
 int ui::main() {
     ui::window mainWindow{1, 1};
     mainWindow.onDestroy.add([&] { ui::quit(); }).release();
-
+    std::unique_ptr<ui::window> sizingWindow;
+    std::unique_ptr<ui::window> tooltipWindow;
     // TODO load from file
-    appui::state fake = {
-        72, 40, 76, 3, 0.7, 0.4, 2.0, 1.0, 1.0, 1.0, 0x00FFFFFFu
-    };
+    appui::state fake = {72, 40, 76, 3, 0.7, 0.4, 2.0, 1.0, 1.0, 1.0, 0x00FFFFFFu};
+    appui::sizing_config sizingConfig{fake};
+    appui::tooltip_config tooltipConfig{fake};
 
-    auto loopThread = [&](auto&& f) {
-        return [&, f = std::move(f)](std::atomic<bool>& terminate) {
-            while (!terminate) try {
-                f(terminate);
-            } catch (const std::exception&) {
-                Sleep(500);
-            }
-        };
-    };
-
+    std::atomic<bool> terminate{false};
+    // These more granular mutexes (mutices?) synchronize writes to each pair of strips
+    // separately. If a capture thread is unable to acquire this mutex in a timely
+    // manner, it assumes the main thread has acquired it for the purpose of displaying
+    // a static pattern and will destroy the capture object until the mutex becomes
+    // available again. (`videoMutex` must also be held while writing `averageColor`.)
+    std::timed_mutex videoMutex;
+    std::timed_mutex audioMutex;
+    // Start in the non-capturing state. The locks will be released after everything
+    // is ready, and maybe the initial configuration is done.
+    std::unique_lock<std::timed_mutex> videoLock{videoMutex};
+    std::unique_lock<std::timed_mutex> audioLock{audioMutex};
+    // This mutex synchronizes writes to `frameData` with the serial thread's reads.
+    // A write-release that set `frameDirty` must be preceded by firing off `frameEv`.
+    // NOTE: deadlock-avoiding resource hierarchy: `videoLock`, then `audioLock`, then `mut`.
     std::mutex mut;
     std::condition_variable frameEv;
+
+    std::atomic<uint32_t> averageColor = fake.color;
     bool frameDirty = false;
     UINT frameData[4][AMBILIGHT_CHUNKS_PER_STRIP * AMBILIGHT_SERIAL_CHUNK] = {};
 
     auto updateLocked = [&](auto&& unsafePart) {
         std::lock_guard<std::mutex> lock(mut);
-        if (!unsafePart())
-            return;
+        unsafePart();
         frameDirty = true;
         frameEv.notify_all();
         // TODO render the preview
     };
 
-    auto updateFrom = [&](UINT* a, UINT* b, UINT* c, UINT* d, size_t w, size_t h, size_t m) {
-        UINT* ptrs[] = {a, b, c, d};
-        size_t lens[] = {w + h, w + h, m / 2, m / 2};
-        updateLocked([&]{
-            bool any = false;
-            for (size_t i = 0; i < 4; i++) if (ptrs[i]) {
-                if (std::equal(frameData[i], frameData[i] + lens[i], ptrs[i]))
-                    continue;
-                std::copy(ptrs[i], ptrs[i] + lens[i], frameData[i]);
-                any = true;
+    auto loopThread = [&](auto&& f) {
+        return std::thread{[&, f = std::move(f)] {
+            while (!terminate) try {
+                f();
+            } catch (const std::exception&) {
+                // Probably just device reconfiguration or whatever.
+                // TODO there are TODOs scattered around `captureVideo.cpp` and `captureAudio.cpp`;
+                //      these mark actual places where errors can occur due to reconfiguration.
+                //      The rest should be fatal.
+                Sleep(500);
             }
-            return any;
-        });
+        }};
     };
 
-    std::atomic<uint32_t> averageColor = fake.color;
-    auto captureVideo = loopThread([&](std::atomic<bool>& terminate) {
+    auto videoCaptureThread = loopThread([&] {
+        // Wait until the main thread allows capture threads to proceed.
+        { std::unique_lock<std::timed_mutex> lk(videoMutex); };
         size_t w = fake.width;
         size_t h = fake.height;
         auto cap = captureScreen(0, w, h);
-        std::vector<UINT> data((w + h) * 2);
         while (!terminate) if (auto in = cap->next()) {
-            UINT averageComponents[4] = {0, 0, 0, 0};
+            int32_t averageComponents[4] = {0, 0, 0, 0};
             for (const auto& color : in.reinterpret<const BYTE[4]>())
-                for (UINT c = 0; c < 4; c++)
+                for (int c = 0; c < 4; c++)
                     averageComponents[c] += color[c];
+            auto lk = std::unique_lock<std::timed_mutex>(videoMutex, std::chrono::milliseconds(30));
+            if (!lk)
+                return;
             averageColor = 0xFF000000u
-                        | (averageComponents[2] / w / h) << 16
-                        | (averageComponents[1] / w / h) << 8
-                        | (averageComponents[0] / w / h);
-            auto out = data.data();
-#define W_PX(y, x) do { *out++ = in[(y) * w + (x)]; } while (0)
-            // bottom right -> bottom left -> top left; bottom right -> top right -> top left
-            for (auto x = w; x--; ) W_PX(h - 1, x);
-            for (auto y = h; y--; ) W_PX(y, 0);
-            for (auto y = h; y--; ) W_PX(y, w - 1);
-            for (auto x = w; x--; ) W_PX(0, x);
+                        | (UINT)(averageComponents[2] / w / h) << 16
+                        | (UINT)(averageComponents[1] / w / h) << 8
+                        | (UINT)(averageComponents[0] / w / h);
+            updateLocked([&] {
+#define W_PX(out, y, x) do { *out++ = in[(y) * w + (x)]; } while (0)
+                auto a = frameData[0], b = frameData[1];
+                for (auto x = w; x--; ) W_PX(a, h - 1, x); // bottom right -> bottom left
+                for (auto y = h; y--; ) W_PX(a, y, 0);     // bottom left -> top left
+                for (auto y = h; y--; ) W_PX(b, y, w - 1); // bottom right -> top right
+                for (auto x = w; x--; ) W_PX(b, 0, x);     // top right -> top left
 #undef W_PX
-            updateFrom(data.data(), data.data() + w + h, nullptr, nullptr, w, h, 0);
+            });
         }
     });
 
-    auto captureAudio = loopThread([&](std::atomic<bool>& terminate) {
+    auto audioCaptureThread = loopThread([&] {
+        {
+            std::unique_lock<std::timed_mutex> lk(audioMutex);
+            // Unlike the video capturer, the first iteration is not guaranteed to return anything;
+            // there may be silence that needs to be displayed as zeros.
+            updateLocked([&] {
+                std::fill(std::begin(frameData[2]), std::end(frameData[2]), 0xFF000000u);
+                std::fill(std::begin(frameData[3]), std::end(frameData[3]), 0xFF000000u);
+            });
+        };
         double lastH = 0;
         double lastS = 0;
         auto cap = captureDefaultAudioOutput();
-        std::vector<UINT> data(fake.musicLeds);
-        updateFrom(nullptr, nullptr, data.data(), data.data() + data.size() / 2, 0, 0, data.size());
         while (!terminate) if (auto in = cap->next()) {
             // 1. Need a lower bound on value so that the strip is always visible at all. 
             // 2. When value is 0, both hue and saturation become undefined (all colors are black),
@@ -502,29 +517,35 @@ int ui::main() {
             //    hue/saturation when any value is OK to avoid that.
             auto [a, h, s, v] = argb2ahsv(u2qd(averageColor));
             auto [_, r, g, b] = ahsv2argb({1, (h = lastH = s ? h : lastH), (s = lastS = v ? s : lastS), std::max(v, 0.5)});
-            UINT delta = qd2u({0, r * 2 / in.size(), g * 2 / in.size(), b * 2 / in.size()});
-            size_t i = 0, j = 0;
-            for (size_t lim : {data.size() / 2, data.size()}) {
-                for (size_t k = in.size() / 2; k--; j++)
-                    // Yay, hardcoded coefficients!
-                    for (size_t w = (size_t)(tanh(in[j] / exp((k + 1) * 0.55) / 0.12) * (lim - i)); w--; )
-                        data[i++] = 0xFF000000u | (delta * (k + 1));
-                while (i < lim)
-                    data[i++] = 0xFF000000u;
-            }
-            updateFrom(nullptr, nullptr, data.data(), data.data() + data.size() / 2, 0, 0, data.size());
+            auto delta = qd2u({0, r * 2 / in.size(), g * 2 / in.size(), b * 2 / in.size()});
+            auto lk = std::unique_lock<std::timed_mutex>(audioMutex, std::chrono::milliseconds(30));
+            if (!lk)
+                return;
+            updateLocked([&] {
+                size_t j = 0, size = fake.musicLeds / 2;
+                for (auto* out : {frameData[2], frameData[3]}) {
+                    size_t i = 0;
+                    for (size_t k = in.size() / 2; k--; j++)
+                        // Yay, hardcoded coefficients! TODO figure out a better mapping.
+                        for (size_t w = (size_t)(tanh(in[j] / exp((k + 1) * 0.55) / 0.12) * (size - i)); w--; )
+                            out[i++] = 0xFF000000u | (delta * (UINT)(k + 1));
+                    while (i < size)
+                        out[i++] = 0xFF000000u;
+                }
+            });
         }
     });
 
-    auto transmitData = loopThread([&](std::atomic<bool>& terminate) {
-        auto filename = L"\\\\.\\COM" + std::to_wstring(fake.serial.load());
+    auto serialThread = loopThread([&] {
+        auto port = fake.serial.load();
+        auto filename = L"\\\\.\\COM" + std::to_wstring(port);
         serial comm{filename.c_str()};
-        for (size_t iter = 0; !terminate; iter++) {
+        for (size_t iter = 0; port == fake.serial && !terminate; iter++) {
             if (auto lock = std::unique_lock<std::mutex>(mut)) {
                 // Ping the arduino at least once per ~1.6s so that it knows the app is still running.
                 if (iter % 16 && !frameEv.wait_for(lock, std::chrono::milliseconds(100), [&]{ return frameDirty; }))
                     continue;
-                // TODO color offsets
+                // TODO apply color offsets
                 for (uint8_t strip = 0; strip < 4; strip++)
                     comm.update(strip, frameData[strip], fake.gamma, strip < 2 ? fake.brightnessV : fake.brightnessA);
                 frameDirty = false;
@@ -533,46 +554,44 @@ int ui::main() {
         }
     });
 
-    std::optional<util::thread> serialThread{transmitData};
-    std::optional<util::thread> videoCaptureThread;
-    std::optional<util::thread> audioCaptureThread;
-
-    std::unique_ptr<ui::window> sizingWindow;
-    std::unique_ptr<ui::window> tooltipWindow;
-    appui::sizing_config sizingConfig{fake};
-    appui::tooltip_config tooltipConfig{fake};
+    DEFER {
+        terminate = true;
+        // Must release the locks first to allow the threads to actually check the flag.
+        if (videoLock) videoLock.unlock();
+        if (audioLock) audioLock.unlock();
+        videoCaptureThread.join();
+        audioCaptureThread.join();
+        serialThread.join();
+    };
 
     auto setTestPattern = [&] {
-        videoCaptureThread.reset();
-        audioCaptureThread.reset();
+        if (!videoLock) videoLock.lock();
+        if (!audioLock) audioLock.lock();
         updateLocked([&] {
-            // See screensetup.png.
-            size_t w = fake.width, h = fake.height, m = fake.musicLeds, s = w + h;
             for (auto& strip : frameData)
                 std::fill(std::begin(strip), std::end(strip), 0xFF000000u);
+            // The pattern depicted in screensetup.png.
+            size_t w = fake.width, h = fake.height, m = fake.musicLeds, s = w + h;
             frameData[0][0] = frameData[1][0] = 0xFF00FFFFu;
             frameData[0][w] = frameData[0][w - 1] = 0xFFFFFF00u;
             frameData[1][h] = frameData[1][h - 1] = 0xFFFF00FFu;
             frameData[0][s - 1] = frameData[1][s - 1] = 0xFFFFFFFFu;
             std::fill(frameData[2], frameData[2] + m / 2, 0xFFFFFF00u);
             std::fill(frameData[3], frameData[3] + m / 2, 0xFF00FFFFu);
-            return true;
         });
     };
 
-    auto setVideoPattern = [&] {
-        uint32_t c = fake.color;
-        if (c & 0xFF000000) {
-            videoCaptureThread.reset();
-            averageColor = c;
+    auto setVideoPattern = [&](uint32_t color) {
+        if (color & 0xFF000000) {
+            if (!videoLock) videoLock.lock();
+            averageColor = color;
             updateLocked([&] {
                 size_t s = fake.width + fake.height;
-                std::fill(frameData[0], frameData[0] + s, c);
-                std::fill(frameData[1], frameData[1] + s, c);
-                return true;
+                std::fill(frameData[0], frameData[0] + s, color);
+                std::fill(frameData[1], frameData[1] + s, color);
             });
-        } else if (!videoCaptureThread) {
-            videoCaptureThread.emplace(captureVideo);
+        } else if (videoLock) {
+            videoLock.unlock();
         }
     };
 
@@ -580,8 +599,8 @@ int ui::main() {
         if (sizingWindow)
             sizingWindow->close();
         mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
-        setVideoPattern();
-        audioCaptureThread.emplace(captureAudio);
+        setVideoPattern(fake.color);
+        audioLock.unlock();
     }).release();
     sizingConfig.onChange.add([&](int i, size_t value) {
         switch (i) {
@@ -590,12 +609,7 @@ int ui::main() {
             case 2: fake.musicLeds = value; break;
             case 3: fake.serial = value; break;
         }
-        if (i == 3) {
-            serialThread.reset();
-            serialThread.emplace(transmitData);
-        } else {
-            setTestPattern();
-        }
+        setTestPattern();
     }).release();
 
     //tooltipConfig.setStatusMessage(L"Serial port offline");
@@ -617,7 +631,7 @@ int ui::main() {
             case 1: fake.brightnessA = v; break;
         }
         // Ping the serial thread.
-        updateLocked([&]{ return true; });
+        updateLocked([&]{ });
     }).release();
     tooltipConfig.onGamma.add([&](int i, double v) {
         switch (i) {
@@ -626,11 +640,10 @@ int ui::main() {
             case 2: fake.dg = v; break;
             case 3: fake.db = v; break;
         }
-        updateLocked([&]{ return true; });
+        updateLocked([&]{ });
     }).release();
     tooltipConfig.onColor.add([&](uint32_t c) {
-        fake.color = c;
-        setVideoPattern();
+        setVideoPattern(fake.color = c);
     }).release();
 
     mainWindow.onNotificationIcon.add([&](POINT p, bool primary) {
@@ -666,10 +679,9 @@ int ui::main() {
         tooltipWindow->show();
     }).release();
 
-    if (false /* TODO if config not loaded */) {
+    if (false /* TODO if config not loaded */)
         tooltipConfig.onSettings();
-    } else {
+    else
         sizingConfig.onDone();
-    }
     return ui::dispatch();
 }
