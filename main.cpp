@@ -213,17 +213,11 @@ namespace appui {
     };
 
     struct gray_bg : ui::texrect {
-        void setTransparent(bool value) {
-            transparent = value;
-            invalidate();
-        }
-
     protected:
         winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
             return ctx.cachedTexture<extraWidgets>(); }
-        RECT getOuter() const override { return {15 + transparent, 163, 16 + transparent, 164}; }
+        RECT getOuter() const override { return {15, 163, 16, 164}; }
         RECT getInner() const override { return getOuter(); }
-        bool transparent = false;
     };
 
     struct color_config_tab : gray_bg {
@@ -248,10 +242,10 @@ namespace appui {
 
     private:
         padded<ui::grid> grid{{10, 10}, 2, 4};
-        padded_label gammaLabel{{10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        padded_label rOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 18, 0xFFFF3333u}};
-        padded_label gOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 18, 0xFF33FF33u}};
-        padded_label bOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 18, 0xFF3333FFu}};
+        padded_label gammaLabel{{10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded_label rOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFFFF3333u}};
+        padded_label gOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF33FF33u}};
+        padded_label bOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF3333FFu}};
         padded<ui::slider> gammaSlider{{10, 10}};
         padded<ui::slider> rOffSlider{{10, 10}};
         padded<ui::slider> gOffSlider{{10, 10}};
@@ -291,96 +285,57 @@ namespace appui {
     };
 
     struct extra_button : gray_bg {
-        extra_button(const ui::text_part& text)
-            : label({text})
+        extra_button(const ui::text_part& text, bool state = false)
+            : state(state), label({10, 0}, {text})
         {
             setContents(&button);
-            pad.set(0, 0, &label);
-            pad.setColStretch(0, 1);
-            pad.setRowStretch(0, 1);
             button.setBorderless(true);
-            setTransparent(true);
-        }
-
-        bool setState(bool value) {
-            state = value;
-            setTransparent(!state);
-            return onClick(state);
         }
 
     public:
         util::event<bool> onClick;
 
-    private:
-        bool state = false;
-        ui::label label;
-        ui::grid pad{1, 1};
-        ui::button button{pad};
-        util::event<>::handle h = button.onClick.add([this] { return setState(!state); });
-    };
-
-    struct extra_tabs : ui::grid {
-        extra_tabs(const state& init, util::event<int, double>& onGamma, util::event<uint32_t>& onColor)
-            : ui::grid(1, 3)
-            , gammaTab(init, onGamma)
-            , colorTab(init, onColor)
-        {
-            if (init.color >> 24) {
-                set(0, 1, &colorTab);
-                colorButton.setState(true);
-            }
-            buttons.set(0, 0, &gammaButton);
-            buttons.set(1, 0, &colorButton);
-            buttons.setColStretch(0, 1);
-            buttons.setColStretch(1, 1);
-            set(0, 2, &buttons);
-            setColStretch(0, 1);
+    protected:
+        winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
+            return state ? gray_bg::getTexture(ctx) : winapi::com_ptr<ID3D11Texture2D>{};
         }
 
     private:
-        color_config_tab gammaTab;
-        color_select_tab colorTab;
-        ui::grid buttons{2, 1};
-        extra_button gammaButton{{L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        extra_button colorButton{{L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        util::event<bool>::handle gammaH = gammaButton.onClick.add([this](bool show) {
-            set(0, 0, show ? &gammaTab : nullptr);
-        });
-        util::event<bool>::handle colorH = colorButton.onClick.add([this](bool show) {
-            set(0, 1, show ? &colorTab : nullptr);
-            return colorTab.onChange(colorTab.value() & (show ? 0xFFFFFFFFu : 0x00FFFFFFu));
-        });
+        bool state;
+        padded_label label;
+        ui::button button{label.pad};
+        util::event<>::handle h = button.onClick.add([this] { invalidate(); return onClick(state ^= 1); });
     };
 
     struct tooltip_config : ui::grid {
         tooltip_config(const state& init)
-            : ui::grid(1, 2)
-            , extraTabs(init, onGamma, onColor)
+            : ui::grid(1, 5)
+            , gammaTab(init, onGamma)
+            , colorTab(init, onColor)
+            , gammaButton({L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22})
+            , colorButton({L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}, init.color >> 24)
         {
-            set(0, 0, &extraTabs);
-            set(0, 1, &onTransparent.pad);
+            if (init.color >> 24)
+                set(0, 0, &colorTab);
+            set(0, 3, &brightnessGrid.pad);
+            set(0, 4, &buttons);
             setColStretch(0, 1);
 
-            onTransparent.set(0, 0, &brightnessGrid);
-            onTransparent.set(0, 1, &bottomRow);
-            onTransparent.setColStretch(0, 1);
+            buttons.set(0, 0, &gammaButton);
+            buttons.set(1, 0, &colorButton);
+            buttons.set(3, 0, &sButton);
+            buttons.set(4, 0, &qButton);
+            buttons.setColStretch(2, 1);
+            sButton.setBorderless(true);
+            qButton.setBorderless(true);
+
             brightnessGrid.set(0, 0, &bLabel.pad);
             brightnessGrid.set(1, 0, &bSlider.pad);
             brightnessGrid.set(0, 1, &mLabel.pad);
             brightnessGrid.set(1, 1, &mSlider.pad);
             brightnessGrid.setColStretch(1, 1);
-            bottomRow.set(0, 0, &statusText.pad, ui::grid::align_start);
-            bottomRow.set(1, 0, &sButton.pad);
-            bottomRow.set(2, 0, &qButton.pad);
-            bottomRow.setColStretch(0, 1);
             bSlider.setValue(init.brightnessV);
             mSlider.setValue(init.brightnessA);
-            sButton.setBorderless(true);
-            qButton.setBorderless(true);
-        }
-
-        void setStatusMessage(util::span<const wchar_t> msg) {
-            statusText.modText([&](auto& chunks) { chunks[0].data = msg; });
         }
 
     public:
@@ -391,20 +346,29 @@ namespace appui {
         util::event<> onQuit;
 
     private:
-        extra_tabs extraTabs;
-        padded<ui::grid> onTransparent{{10, 10}, 1, 3};
-        padded<ui::grid> brightnessGrid{{10, 0}, 2, 2};
-        padded_label bLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        padded_label mLabel{{10, 10}, {L"\uf001", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
+        ui::grid buttons{5, 1};
+        color_config_tab gammaTab;
+        color_select_tab colorTab;
+        extra_button gammaButton;
+        extra_button colorButton;
+        padded_label sLabel{{10, 0}, {L"\uf013", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded_label qLabel{{10, 0}, {L"\uf011", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        ui::button sButton{sLabel.pad};
+        ui::button qButton{qLabel.pad};
+
+        padded<ui::grid> brightnessGrid{{10, 10}, 2, 2};
+        padded_label bLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded_label mLabel{{10, 10}, {L"\uf001", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
         padded<texslider<2>> bSlider{{10, 10}};
         padded<texslider<2>> mSlider{{10, 10}};
 
-        padded<ui::grid> bottomRow{{10, 0}, 3, 1};
-        padded_label statusText{{10, 10}, {L"", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 18, 0x80FFFFFFu}};
-        ui::label sLabel{{{L"\uf013", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
-        ui::label qLabel{{{L"\uf011", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
-        padded<ui::button> sButton{{10, 10}, sLabel};
-        padded<ui::button> qButton{{10, 10}, qLabel};
+        util::event<bool>::handle gammaH = gammaButton.onClick.add([this](bool show) {
+            set(0, 0, show ? &gammaTab : nullptr);
+        });
+        util::event<bool>::handle colorH = colorButton.onClick.add([this](bool show) {
+            set(0, 1, show ? &colorTab : nullptr);
+            return onColor(colorTab.value() & (show ? 0xFFFFFFFFu : 0x00FFFFFFu));
+        });
 
         util::event<double>::handle bHandler = bSlider.onChange.add([this](double v) { return onBrightness(0, v); });
         util::event<double>::handle mHandler = mSlider.onChange.add([this](double v) { return onBrightness(1, v); });
@@ -498,15 +462,7 @@ int ui::main() {
     });
 
     auto audioCaptureThread = loopThread([&] {
-        {
-            std::unique_lock<std::timed_mutex> lk(audioMutex);
-            // Unlike the video capturer, the first iteration is not guaranteed to return anything;
-            // there may be silence that needs to be displayed as zeros.
-            updateLocked([&] {
-                std::fill(std::begin(frameData[2]), std::end(frameData[2]), 0xFF000000u);
-                std::fill(std::begin(frameData[3]), std::end(frameData[3]), 0xFF000000u);
-            });
-        };
+        { std::unique_lock<std::timed_mutex> lk(audioMutex); };
         double lastH = 0;
         double lastS = 0;
         auto cap = captureDefaultAudioOutput();
@@ -600,7 +556,13 @@ int ui::main() {
             sizingWindow->close();
         mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
         setVideoPattern(fake.color);
-        audioLock.unlock();
+        if (audioLock) {
+            updateLocked([&] {
+                std::fill(std::begin(frameData[2]), std::end(frameData[2]), 0xFF000000u);
+                std::fill(std::begin(frameData[3]), std::end(frameData[3]), 0xFF000000u);
+            });
+            audioLock.unlock();
+        }
     }).release();
     sizingConfig.onChange.add([&](int i, size_t value) {
         switch (i) {
