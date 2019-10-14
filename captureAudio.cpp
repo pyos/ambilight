@@ -97,14 +97,14 @@ using AudioSampleReader = float(BYTE*);
 static AudioSampleReader* makeAudioSampleReader(WAVEFORMATEXTENSIBLE* pwfx) {
     if (pwfx->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) switch (pwfx->Format.wBitsPerSample) {
         case 32: return [](BYTE* at) -> float { return *(float*)at; };
-        case 64: return [](BYTE* at) -> float { return *(double*)at; };
+        case 64: return [](BYTE* at) -> float { return (float)*(double*)at; };
     }
     if (pwfx->SubFormat == KSDATAFORMAT_SUBTYPE_PCM) switch (pwfx->Format.wBitsPerSample) {
         // TODO there's `pwfx->Samples.wValidBitsPerSample` for scaling
-        case 8:  return [](BYTE* at) -> float { return *(INT8*)at / 256.; };
-        case 16: return [](BYTE* at) -> float { return *(INT16*)at / (256. * 256.); };
-        case 24: return [](BYTE* at) -> float { return (*(INT32*)at & 0xFFFFFF) / (256. * 256. * 256.); };
-        case 32: return [](BYTE* at) -> float { return *(INT32*)at / (256. * 256. * 256. * 256.); };
+        case 8:  return [](BYTE* at) -> float { return *(INT8*)at / 256.f; };
+        case 16: return [](BYTE* at) -> float { return *(INT16*)at / (256.f * 256.f); };
+        case 24: return [](BYTE* at) -> float { return (*(INT32*)at & 0xFFFFFF) / (256.f * 256.f * 256.f); };
+        case 32: return [](BYTE* at) -> float { return *(INT32*)at / (256.f * 256.f * 256.f * 256.f); };
     }
     // TODO A-law or mu-law format, probably.
     return [](BYTE*) { return 0.0f; };
@@ -222,9 +222,9 @@ private:
         // assert(out.size() < in.size());
         kiss_fftr(fft.get(), in.data(), fftBuffer.data());
         for (size_t i = 1, j = 0; j < out.size(); j++) {
-            double m = 0;
+            float m = 0;
             for (size_t q = 1 << j, d = 0; q-- && i < fftBuffer.size(); i++)
-                m += (sqrt(fftBuffer[i].r * fftBuffer[i].r + fftBuffer[i].i * fftBuffer[i].i) - m) / ++d;
+                m += (sqrtf(fftBuffer[i].r * fftBuffer[i].r + fftBuffer[i].i * fftBuffer[i].i) - m) / ++d;
             out[j] = (out[j] - m) * (m > out[j] ? DFT_EWMA_RISE : DFT_EWMA_DROP) + m;
         }
     }
