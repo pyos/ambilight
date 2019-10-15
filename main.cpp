@@ -353,6 +353,7 @@ namespace appui {
 
 int ui::main() {
     ui::window mainWindow{1, 1};
+    mainWindow.setTitle(L"Ambilight");
     mainWindow.onDestroy.addForever([&] { ui::quit(); });
     std::unique_ptr<ui::window> sizingWindow;
     std::unique_ptr<ui::window> tooltipWindow;
@@ -561,6 +562,7 @@ int ui::main() {
         sizingWindow = std::make_unique<ui::window>(800, 800, (w - 800) / 2, (h - 800) / 2);
         sizingWindow->setRoot(&sizingConfig.pad);
         sizingWindow->setBackground(0xcc111111u);
+        sizingWindow->setTitle(L"Ambilight Setup");
         sizingWindow->setShadow(true);
         sizingWindow->show();
         setTestPattern();
@@ -606,6 +608,7 @@ int ui::main() {
         if (vGravity == ui::window::gravity_end) p.y -= size.y;
         tooltipWindow = std::make_unique<ui::window>(size.x, size.y, p.x, p.y, &mainWindow);
         tooltipWindow->onBlur.addForever([&] { tooltipWindow->close(); });
+        tooltipWindow->setTitle(L"Ambilight");
         tooltipWindow->setBackground(0xa0000000u, true);
         tooltipWindow->setDragByEmptyAreas(false);
         tooltipWindow->setGravity(hGravity, vGravity);

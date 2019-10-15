@@ -63,6 +63,9 @@ namespace ui {
         // Whether this window is maximized, duh.
         bool isMaximized() { return IsZoomed(*this); }
 
+        // Set the window title.
+        void setTitle(const wchar_t* value) { winapi::throwOnFalse(SetWindowText(*this, value)); }
+
         // Set the direction in which the window will change size to accomodate the root widget.
         void setGravity(gravity h, gravity v) { hGravity = h, vGravity = v; }
 
