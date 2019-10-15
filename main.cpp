@@ -529,9 +529,7 @@ int ui::main() {
         }
     };
 
-    sizingConfig.onDone.addForever([&] {
-        if (sizingWindow)
-            sizingWindow->close();
+    auto setBothPatterns = [&] {
         mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
         setVideoPattern(fake.color);
         if (audioLock) {
@@ -543,7 +541,9 @@ int ui::main() {
             });
             audioLock.unlock();
         }
-    });
+    };
+
+    sizingConfig.onDone.addForever([&] { sizingWindow->close(); });
     sizingConfig.onChange.addForever([&](int i, size_t value) {
         switch (i) {
             case 0: fake.width = value; break;
@@ -563,6 +563,7 @@ int ui::main() {
         sizingWindow->setRoot(&sizingConfig.pad);
         sizingWindow->setBackground(0xcc111111u);
         sizingWindow->setTitle(L"Ambilight Setup");
+        sizingWindow->onClose.addForever([&]{ setBothPatterns(); });
         sizingWindow->setShadow(true);
         sizingWindow->show();
         setTestPattern();
@@ -620,6 +621,6 @@ int ui::main() {
     if (false /* TODO if config not loaded */)
         tooltipConfig.onSettings();
     else
-        sizingConfig.onDone();
+        setBothPatterns();
     return ui::dispatch();
 }
