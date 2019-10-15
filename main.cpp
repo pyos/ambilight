@@ -74,16 +74,19 @@ namespace appui {
             grid.set(3, row, &incButton.pad);
             decButton.setBorderless(true);
             incButton.setBorderless(true);
-            decButton.onClick.addForever([=]{ return setValue(slider.mapValue(min, max, step) - step); });
-            incButton.onClick.addForever([=]{ return setValue(slider.mapValue(min, max, step) + step); });
-            slider.onChange.addForever([=](double) { return setValue(slider.mapValue(min, max, step)); });
+            decButton.onClick.addForever([=]{ setValue(value() - step); return onChange(value()); });
+            incButton.onClick.addForever([=]{ setValue(value() + step); return onChange(value()); });
+            slider.onChange.addForever([=](double) { setValue(value()); return onChange(value()); });
         }
 
-        bool setValue(size_t v) {
+        size_t value() const {
+            return slider.mapValue(min, max, step);
+        }
+
+        void setValue(size_t v) {
             slider.setValue(v, min, max, step);
             numBuffer = std::to_wstring(v);
             numLabel.modText([&](auto& chunks) { chunks[0].data = numBuffer; });
-            return onChange(v);
         }
 
     public:
@@ -165,8 +168,12 @@ namespace appui {
             h.setValue(init.height);
             e.setValue(init.musicLeds);
             s.setValue(init.serial);
-            w.onChange.addForever([this](size_t v) { return onChange(0, v); });
-            h.onChange.addForever([this](size_t v) { return onChange(1, v); });
+            w.onChange.addForever([this](size_t v) {
+                w.setValue(v = std::min(v, LIMIT - h.value()));
+                return onChange(0, v); });
+            h.onChange.addForever([this](size_t v) {
+                h.setValue(v = std::min(v, LIMIT - w.value()));
+                return onChange(1, v); });
             e.onChange.addForever([this](size_t v) { return onChange(2, v); });
             s.onChange.addForever([this](size_t v) { return onChange(3, v); });
             done.onClick.addForever([this]{ return onDone(); });
@@ -185,8 +192,6 @@ namespace appui {
         padded<ui::grid> sliderGrid{{20, 0}, 5, 4};
         padded<ui::grid> bottomRow{{20, 20}, 6, 1};
         ui::button done{doneLabel.pad};
-        // The actual limit is 1 <= w + h <= LIMIT, but sliders jumping around
-        // would probably be confusing.
         static constexpr size_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
         controlled_number w{sliderGrid, 0, L"Screen width",  1, LIMIT * 4 / 5, 1, true};
         controlled_number h{sliderGrid, 1, L"Screen height", 1, LIMIT * 4 / 5, 1, true};
