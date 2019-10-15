@@ -38,6 +38,9 @@ namespace util {
             return {this, unsubscribe{--it}};
         }
 
+        template <typename F>
+        void addForever(F&& cb) { add(std::forward<F>(cb)).release(); }
+
     private:
         std::list<std::function<bool(ArgTypes...)>> callbacks;
     };

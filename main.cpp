@@ -74,6 +74,9 @@ namespace appui {
             grid.set(3, row, &incButton.pad);
             decButton.setBorderless(true);
             incButton.setBorderless(true);
+            decButton.onClick.addForever([=]{ return setValue(slider.mapValue(min, max, step) - step); });
+            incButton.onClick.addForever([=]{ return setValue(slider.mapValue(min, max, step) + step); });
+            slider.onChange.addForever([=](double) { return setValue(slider.mapValue(min, max, step)); });
         }
 
         bool setValue(size_t v) {
@@ -95,12 +98,6 @@ namespace appui {
         padded<ui::button> decButton{{5, 0}, decLabel};
         padded<ui::button> incButton{{5, 0}, incLabel};
         ui::slider slider;
-        util::event<>::handle m1 = decButton.onClick.add([this]{
-            return setValue(slider.mapValue(min, max, step) - step); });
-        util::event<>::handle p1 = incButton.onClick.add([this]{
-            return setValue(slider.mapValue(min, max, step) + step); });
-        util::event<double>::handle sv = slider.onChange.add([this](double) {
-            return setValue(slider.mapValue(min, max, step)); });
         std::wstring numBuffer;
     };
 
@@ -168,6 +165,11 @@ namespace appui {
             h.setValue(init.height);
             e.setValue(init.musicLeds);
             s.setValue(init.serial);
+            w.onChange.addForever([this](size_t v) { return onChange(0, v); });
+            h.onChange.addForever([this](size_t v) { return onChange(1, v); });
+            e.onChange.addForever([this](size_t v) { return onChange(2, v); });
+            s.onChange.addForever([this](size_t v) { return onChange(3, v); });
+            done.onClick.addForever([this]{ return onDone(); });
         }
 
     public:
@@ -192,12 +194,6 @@ namespace appui {
         controlled_number s{bottomRow,  0, L"Serial port",   1, 16, 1};
         // A hacky way to set a constant size for the number labels:
         ui::spacer constNumWidth{{60, 1}};
-
-        util::event<size_t>::handle wHandler = w.onChange.add([this](size_t v) { return onChange(0, v); });
-        util::event<size_t>::handle hHandler = h.onChange.add([this](size_t v) { return onChange(1, v); });
-        util::event<size_t>::handle eHandler = e.onChange.add([this](size_t v) { return onChange(2, v); });
-        util::event<size_t>::handle sHandler = s.onChange.add([this](size_t v) { return onChange(3, v); });
-        util::event<>::handle doneHandler = done.onClick.add([this]{ return onDone(); });
     };
 
     template <int i>
@@ -229,9 +225,7 @@ namespace appui {
     enum setting { Y, R, G, B, Lv, La };
 
     struct color_config_tab : gray_bg {
-        color_config_tab(const state& init, util::event<setting, double>& onChange)
-            : onChange(onChange)
-        {
+        color_config_tab(const state& init, util::event<setting, double>& onChange) {
             setContents(&grid.pad);
             grid.set({&yLabel.pad, &ySlider.pad,
                       &rLabel.pad, &rSlider.pad,
@@ -242,6 +236,10 @@ namespace appui {
             rSlider.setValue(init.dr);
             gSlider.setValue(init.dg);
             bSlider.setValue(init.db);
+            ySlider.onChange.addForever([&](double value) { return onChange(Y, value * 2 + 1); });
+            rSlider.onChange.addForever([&](double value) { return onChange(R, value); });
+            gSlider.onChange.addForever([&](double value) { return onChange(G, value); });
+            bSlider.onChange.addForever([&](double value) { return onChange(B, value); });
         }
 
     private:
@@ -254,23 +252,18 @@ namespace appui {
         padded<ui::slider> rSlider{{10, 10}};
         padded<ui::slider> gSlider{{10, 10}};
         padded<ui::slider> bSlider{{10, 10}};
-        util::event<setting, double>& onChange;
-        util::event<double>::handle yHandler = ySlider.onChange.add([this](double value) { return onChange(Y, value * 2 + 1); });
-        util::event<double>::handle rHandler = rSlider.onChange.add([this](double value) { return onChange(R, value); });
-        util::event<double>::handle gHandler = gSlider.onChange.add([this](double value) { return onChange(G, value); });
-        util::event<double>::handle bHandler = bSlider.onChange.add([this](double value) { return onChange(B, value); });
     };
 
     struct color_select_tab : gray_bg {
-        color_select_tab(const state& init, util::event<uint32_t>& onChange)
-            : onChange(onChange)
-        {
+        color_select_tab(const state& init, util::event<uint32_t>& onChange) {
             setContents(&grid.pad);
             grid.set({&hueSlider.pad, &satSlider.pad});
             grid.setColStretch(0, 1);
             auto [a, h, s, v] = argb2ahsv(u2qd(init.color));
             hueSlider.setValue(h);
             satSlider.setValue(s);
+            hueSlider.onChange.addForever([&](double) { return onChange(value()); });
+            satSlider.onChange.addForever([&](double) { return onChange(value()); });
         }
 
         uint32_t value() const {
@@ -278,12 +271,9 @@ namespace appui {
         }
 
     private:
-        util::event<uint32_t>& onChange;
         padded<ui::grid> grid{{10, 10}, 1, 2};
         padded<texslider<0>> hueSlider{{10, 10}};
         padded<texslider<1>> satSlider{{10, 10}};
-        util::event<double>::handle hueHandler = hueSlider.onChange.add([this](double) { return onChange(value()); });
-        util::event<double>::handle satHandler = satSlider.onChange.add([this](double) { return onChange(value()); });
     };
 
     struct tooltip_config : ui::grid {
@@ -313,6 +303,18 @@ namespace appui {
             brightnessGrid.setColStretch(1, 1);
             bSlider.setValue(init.brightnessV);
             mSlider.setValue(init.brightnessA);
+
+            gammaButton.onClick.addForever([this] { set(0, 0, gammaBg.toggle() ? &gammaTab : nullptr); });
+            colorButton.onClick.addForever([this] {
+                bool show = colorBg.toggle();
+                set(0, 1, show ? &colorTab : nullptr);
+                return onColor(colorTab.value() & (show ? 0xFFFFFFFFu : 0x00FFFFFFu));
+            });
+
+            bSlider.onChange.addForever([this](double v) { return onChange(Lv, v); });
+            mSlider.onChange.addForever([this](double v) { return onChange(La, v); });
+            sButton.onClick.addForever([this]{ return onSettings(); });
+            qButton.onClick.addForever([this]{ return onQuit(); });
         }
 
     public:
@@ -341,26 +343,12 @@ namespace appui {
         padded_label mLabel{{10, 10}, {L"\uf001", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
         padded<texslider<2>> bSlider{{10, 10}};
         padded<texslider<2>> mSlider{{10, 10}};
-
-        util::event<>::handle gammaH = gammaButton.onClick.add([this] {
-            set(0, 0, gammaBg.toggle() ? &gammaTab : nullptr);
-        });
-        util::event<>::handle colorH = colorButton.onClick.add([this] {
-            bool show = colorBg.toggle();
-            set(0, 1, show ? &colorTab : nullptr);
-            return onColor(colorTab.value() & (show ? 0xFFFFFFFFu : 0x00FFFFFFu));
-        });
-
-        util::event<double>::handle bHandler = bSlider.onChange.add([this](double v) { return onChange(Lv, v); });
-        util::event<double>::handle mHandler = mSlider.onChange.add([this](double v) { return onChange(La, v); });
-        util::event<>::handle sHandler = sButton.onClick.add([this]{ return onSettings(); });
-        util::event<>::handle qHandler = qButton.onClick.add([this]{ return onQuit(); });
     };
 }
 
 int ui::main() {
     ui::window mainWindow{1, 1};
-    mainWindow.onDestroy.add([&] { ui::quit(); }).release();
+    mainWindow.onDestroy.addForever([&] { ui::quit(); });
     std::unique_ptr<ui::window> sizingWindow;
     std::unique_ptr<ui::window> tooltipWindow;
     // TODO load from file
@@ -535,7 +523,7 @@ int ui::main() {
         }
     };
 
-    sizingConfig.onDone.add([&] {
+    sizingConfig.onDone.addForever([&] {
         if (sizingWindow)
             sizingWindow->close();
         mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
@@ -549,8 +537,8 @@ int ui::main() {
             });
             audioLock.unlock();
         }
-    }).release();
-    sizingConfig.onChange.add([&](int i, size_t value) {
+    });
+    sizingConfig.onChange.addForever([&](int i, size_t value) {
         switch (i) {
             case 0: fake.width = value; break;
             case 1: fake.height = value; break;
@@ -558,11 +546,10 @@ int ui::main() {
             case 3: fake.serial = value; break;
         }
         setTestPattern();
-    }).release();
+    });
 
-    //tooltipConfig.setStatusMessage(L"Serial port offline");
-    tooltipConfig.onQuit.add([&] { mainWindow.close(); }).release();
-    tooltipConfig.onSettings.add([&] {
+    tooltipConfig.onQuit.addForever([&] { mainWindow.close(); });
+    tooltipConfig.onSettings.addForever([&] {
         mainWindow.clearNotificationIcon();
         auto w = GetSystemMetrics(SM_CXSCREEN);
         auto h = GetSystemMetrics(SM_CYSCREEN);
@@ -572,8 +559,8 @@ int ui::main() {
         sizingWindow->setShadow(true);
         sizingWindow->show();
         setTestPattern();
-    }).release();
-    tooltipConfig.onChange.add([&](appui::setting s, double v) {
+    });
+    tooltipConfig.onChange.addForever([&](appui::setting s, double v) {
         switch (s) {
             case appui::Y: fake.gamma = v; break;
             case appui::R: fake.dr = v; break;
@@ -584,12 +571,12 @@ int ui::main() {
         }
         // Ping the serial thread.
         updateLocked([&]{ });
-    }).release();
-    tooltipConfig.onColor.add([&](uint32_t c) {
+    });
+    tooltipConfig.onColor.addForever([&](uint32_t c) {
         setVideoPattern(fake.color = c);
-    }).release();
+    });
 
-    mainWindow.onNotificationIcon.add([&](POINT p, bool primary) {
+    mainWindow.onNotificationIcon.addForever([&](POINT p, bool primary) {
         ui::window::gravity hGravity = ui::window::gravity_start;
         ui::window::gravity vGravity = ui::window::gravity_start;
         POINT size = tooltipConfig.measure({500, 0});
@@ -613,14 +600,14 @@ int ui::main() {
         if (hGravity == ui::window::gravity_end) p.x -= size.x;
         if (vGravity == ui::window::gravity_end) p.y -= size.y;
         tooltipWindow = std::make_unique<ui::window>(size.x, size.y, p.x, p.y, &mainWindow);
-        tooltipWindow->onBlur.add([&] { tooltipWindow->close(); }).release();
+        tooltipWindow->onBlur.addForever([&] { tooltipWindow->close(); });
         tooltipWindow->setBackground(0xa0000000u, true);
         tooltipWindow->setDragByEmptyAreas(false);
         tooltipWindow->setGravity(hGravity, vGravity);
         tooltipWindow->setRoot(&tooltipConfig);
         tooltipWindow->setTopmost(true);
         tooltipWindow->show();
-    }).release();
+    });
 
     if (false /* TODO if config not loaded */)
         tooltipConfig.onSettings();

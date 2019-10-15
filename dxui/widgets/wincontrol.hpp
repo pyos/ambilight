@@ -7,10 +7,7 @@
 namespace ui {
 #define DXUI_GENERATE_BUTTON(name, clickAction) \
     struct name : button {                                                              \
-        name(window& target)                                                            \
-            : button(icon)                                                              \
-            , doIt(onClick.add([&]{ clickAction; }))                                    \
-        {}                                                                              \
+        name(window& target) : button(icon) { onClick.addForever([&]{clickAction;}); }  \
     protected:                                                                          \
         winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const override;     \
         RECT getOuter() const override;                                                 \
@@ -20,7 +17,6 @@ namespace ui {
             winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const override; \
             RECT getOuter() const override;                                             \
         } icon;                                                                         \
-        util::event<>::handle doIt;                                                     \
     }
 
     DXUI_GENERATE_BUTTON(win_close, target.close());
