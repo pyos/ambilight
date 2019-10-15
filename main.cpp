@@ -189,10 +189,10 @@ namespace appui {
         // The actual limit is 1 <= w + h <= LIMIT, but sliders jumping around
         // would probably be confusing.
         static constexpr size_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
-        controlled_number w{sliderGrid, 0, L"Screen width",  1, LIMIT, 1, true};
-        controlled_number h{sliderGrid, 1, L"Screen height", 1, LIMIT, 1, true};
+        controlled_number w{sliderGrid, 0, L"Screen width",  1, LIMIT * 4 / 5, 1, true};
+        controlled_number h{sliderGrid, 1, L"Screen height", 1, LIMIT * 4 / 5, 1, true};
         controlled_number e{sliderGrid, 2, L"Music LEDs",    2, LIMIT, 2, true};
-        controlled_number s{bottomRow,  0, L"Serial port",   1, 16,    1};
+        controlled_number s{bottomRow,  0, L"Serial port",   1, 16, 1};
         // A hacky way to set a constant size for the number labels:
         ui::spacer constNumWidth{{60, 1}};
 
@@ -213,11 +213,20 @@ namespace appui {
     };
 
     struct gray_bg : ui::texrect {
+        using ui::texrect::texrect;
+
+        bool toggle() {
+            enabled = !enabled;
+            invalidate();
+            return enabled;
+        }
+
     protected:
         winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
-            return ctx.cachedTexture<extraWidgets>(); }
+            return enabled ? ctx.cachedTexture<extraWidgets>() : winapi::com_ptr<ID3D11Texture2D>{}; }
         RECT getOuter() const override { return {15, 163, 16, 164}; }
         RECT getInner() const override { return getOuter(); }
+        bool enabled = true;
     };
 
     struct color_config_tab : gray_bg {
@@ -274,9 +283,8 @@ namespace appui {
             return qd2u(ahsv2argb({1, hueSlider.value(), satSlider.value(), 1}));
         }
 
-    public:
-        util::event<uint32_t>& onChange;
     private:
+        util::event<uint32_t>& onChange;
         padded<ui::grid> grid{{10, 10}, 1, 2};
         padded<texslider<0>> hueSlider{{10, 10}};
         padded<texslider<1>> satSlider{{10, 10}};
@@ -284,50 +292,30 @@ namespace appui {
         util::event<double>::handle satHandler = satSlider.onChange.add([this](double) { return onChange(value()); });
     };
 
-    struct extra_button : gray_bg {
-        extra_button(const ui::text_part& text, bool state = false)
-            : state(state), label({10, 0}, {text})
-        {
-            setContents(&button);
-            button.setBorderless(true);
-        }
-
-    public:
-        util::event<bool> onClick;
-
-    protected:
-        winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
-            return state ? gray_bg::getTexture(ctx) : winapi::com_ptr<ID3D11Texture2D>{};
-        }
-
-    private:
-        bool state;
-        padded_label label;
-        ui::button button{label.pad};
-        util::event<>::handle h = button.onClick.add([this] { invalidate(); return onClick(state ^= 1); });
-    };
-
     struct tooltip_config : ui::grid {
         tooltip_config(const state& init)
             : ui::grid(1, 5)
             , gammaTab(init, onGamma)
             , colorTab(init, onColor)
-            , gammaButton({L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22})
-            , colorButton({L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}, init.color >> 24)
         {
             if (init.color >> 24)
                 set(0, 0, &colorTab);
+            else
+                colorBg.toggle();
+            gammaBg.toggle();
             set(0, 3, &brightnessGrid.pad);
             set(0, 4, &buttons);
             setColStretch(0, 1);
 
-            buttons.set(0, 0, &gammaButton);
-            buttons.set(1, 0, &colorButton);
+            buttons.set(0, 0, &gammaBg);
+            buttons.set(1, 0, &colorBg);
             buttons.set(3, 0, &sButton);
             buttons.set(4, 0, &qButton);
             buttons.setColStretch(2, 1);
             sButton.setBorderless(true);
             qButton.setBorderless(true);
+            gammaButton.setBorderless(true);
+            colorButton.setBorderless(true);
 
             brightnessGrid.set(0, 0, &bLabel.pad);
             brightnessGrid.set(1, 0, &bSlider.pad);
@@ -349,12 +337,16 @@ namespace appui {
         ui::grid buttons{5, 1};
         color_config_tab gammaTab;
         color_select_tab colorTab;
-        extra_button gammaButton;
-        extra_button colorButton;
-        padded_label sLabel{{10, 0}, {L"\uf013", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
-        padded_label qLabel{{10, 0}, {L"\uf011", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded_label gammaLabel{{5, 5}, {L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
+        padded_label colorLabel{{5, 5}, {L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
+        padded_label sLabel{{5, 5}, {L"\uf013", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
+        padded_label qLabel{{5, 5}, {L"\uf011", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
+        ui::button gammaButton{gammaLabel.pad};
+        ui::button colorButton{colorLabel.pad};
         ui::button sButton{sLabel.pad};
         ui::button qButton{qLabel.pad};
+        gray_bg gammaBg{gammaButton};
+        gray_bg colorBg{colorButton};
 
         padded<ui::grid> brightnessGrid{{10, 10}, 2, 2};
         padded_label bLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
@@ -362,10 +354,11 @@ namespace appui {
         padded<texslider<2>> bSlider{{10, 10}};
         padded<texslider<2>> mSlider{{10, 10}};
 
-        util::event<bool>::handle gammaH = gammaButton.onClick.add([this](bool show) {
-            set(0, 0, show ? &gammaTab : nullptr);
+        util::event<>::handle gammaH = gammaButton.onClick.add([this] {
+            set(0, 0, gammaBg.toggle() ? &gammaTab : nullptr);
         });
-        util::event<bool>::handle colorH = colorButton.onClick.add([this](bool show) {
+        util::event<>::handle colorH = colorButton.onClick.add([this] {
+            bool show = colorBg.toggle();
             set(0, 1, show ? &colorTab : nullptr);
             return onColor(colorTab.value() & (show ? 0xFFFFFFFFu : 0x00FFFFFFu));
         });
