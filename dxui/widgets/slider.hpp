@@ -48,7 +48,7 @@ namespace ui {
 
         // Map the current value from [0, 1] to an integer range [min, max].
         template <typename T>
-        T mapValue(T min, T max, T step = 1) {
+        T mapValue(T min, T max, T step = 1) const {
             T r = (T)(value_ * (max - min) + min + step / 2. /* round to closest */);
             return r - r % step;
         }
