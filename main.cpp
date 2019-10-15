@@ -229,41 +229,43 @@ namespace appui {
         bool enabled = true;
     };
 
+    enum setting { Y, R, G, B, Lv, La };
+
     struct color_config_tab : gray_bg {
-        color_config_tab(const state& init, util::event<int, double>& onChange)
+        color_config_tab(const state& init, util::event<setting, double>& onChange)
             : onChange(onChange)
         {
             setContents(&grid.pad);
-            grid.set(0, 0, &gammaLabel.pad);
-            grid.set(0, 1, &rOffLabel.pad);
-            grid.set(0, 2, &gOffLabel.pad);
-            grid.set(0, 3, &bOffLabel.pad);
-            grid.set(1, 0, &gammaSlider.pad);
-            grid.set(1, 1, &rOffSlider.pad);
-            grid.set(1, 2, &gOffSlider.pad);
-            grid.set(1, 3, &bOffSlider.pad);
+            grid.set(0, 0, &yLabel.pad);
+            grid.set(0, 1, &rLabel.pad);
+            grid.set(0, 2, &gLabel.pad);
+            grid.set(0, 3, &bLabel.pad);
+            grid.set(1, 0, &ySlider.pad);
+            grid.set(1, 1, &rSlider.pad);
+            grid.set(1, 2, &gSlider.pad);
+            grid.set(1, 3, &bSlider.pad);
             grid.setColStretch(1, 1);
-            gammaSlider.setValue((init.gamma - 1) / 2); // use gamma from 1 to 3
-            rOffSlider.setValue(init.dr);
-            gOffSlider.setValue(init.dg);
-            bOffSlider.setValue(init.db);
+            ySlider.setValue((init.gamma - 1) / 2); // use gamma from 1 to 3
+            rSlider.setValue(init.dr);
+            gSlider.setValue(init.dg);
+            bSlider.setValue(init.db);
         }
 
     private:
         padded<ui::grid> grid{{10, 10}, 2, 4};
-        padded_label gammaLabel{{10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
-        padded_label rOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFFFF3333u}};
-        padded_label gOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF33FF33u}};
-        padded_label bOffLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF3333FFu}};
-        padded<ui::slider> gammaSlider{{10, 10}};
-        padded<ui::slider> rOffSlider{{10, 10}};
-        padded<ui::slider> gOffSlider{{10, 10}};
-        padded<ui::slider> bOffSlider{{10, 10}};
-        util::event<int, double>& onChange;
-        util::event<double>::handle gammaHandler = gammaSlider.onChange.add([this](double value) { return onChange(0, value * 2 + 1); });
-        util::event<double>::handle rOffHandler = rOffSlider.onChange.add([this](double value) { return onChange(1, value); });
-        util::event<double>::handle gOffHandler = gOffSlider.onChange.add([this](double value) { return onChange(2, value); });
-        util::event<double>::handle bOffHandler = bOffSlider.onChange.add([this](double value) { return onChange(3, value); });
+        padded_label yLabel{{10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded_label rLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFFFF3333u}};
+        padded_label gLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF33FF33u}};
+        padded_label bLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF3333FFu}};
+        padded<ui::slider> ySlider{{10, 10}};
+        padded<ui::slider> rSlider{{10, 10}};
+        padded<ui::slider> gSlider{{10, 10}};
+        padded<ui::slider> bSlider{{10, 10}};
+        util::event<setting, double>& onChange;
+        util::event<double>::handle yHandler = ySlider.onChange.add([this](double value) { return onChange(Y, value * 2 + 1); });
+        util::event<double>::handle rHandler = rSlider.onChange.add([this](double value) { return onChange(R, value); });
+        util::event<double>::handle gHandler = gSlider.onChange.add([this](double value) { return onChange(G, value); });
+        util::event<double>::handle bHandler = bSlider.onChange.add([this](double value) { return onChange(B, value); });
     };
 
     struct color_select_tab : gray_bg {
@@ -295,7 +297,7 @@ namespace appui {
     struct tooltip_config : ui::grid {
         tooltip_config(const state& init)
             : ui::grid(1, 5)
-            , gammaTab(init, onGamma)
+            , gammaTab(init, onChange)
             , colorTab(init, onColor)
         {
             if (init.color >> 24)
@@ -327,9 +329,8 @@ namespace appui {
         }
 
     public:
-        util::event<int, double> onBrightness; // 0 = video, 1 = music
-        util::event<int, double> onGamma;      // 0 = gamma, 1..3 = rgb offsets
-        util::event<uint32_t> onColor;         // 0 = live, 0xFF?????? = constant
+        util::event<setting, double> onChange;
+        util::event<uint32_t> onColor;
         util::event<> onSettings;
         util::event<> onQuit;
 
@@ -363,8 +364,8 @@ namespace appui {
             return onColor(colorTab.value() & (show ? 0xFFFFFFFFu : 0x00FFFFFFu));
         });
 
-        util::event<double>::handle bHandler = bSlider.onChange.add([this](double v) { return onBrightness(0, v); });
-        util::event<double>::handle mHandler = mSlider.onChange.add([this](double v) { return onBrightness(1, v); });
+        util::event<double>::handle bHandler = bSlider.onChange.add([this](double v) { return onChange(Lv, v); });
+        util::event<double>::handle mHandler = mSlider.onChange.add([this](double v) { return onChange(La, v); });
         util::event<>::handle sHandler = sButton.onClick.add([this]{ return onSettings(); });
         util::event<>::handle qHandler = qButton.onClick.add([this]{ return onQuit(); });
     };
@@ -489,10 +490,10 @@ int ui::main() {
         auto port = fake.serial.load();
         auto filename = L"\\\\.\\COM" + std::to_wstring(port);
         serial comm{filename.c_str()};
-        for (size_t iter = 0; port == fake.serial && !terminate; iter++) {
+        while (port == fake.serial && !terminate) {
             if (auto lock = std::unique_lock<std::mutex>(mut)) {
                 // Ping the arduino at least once per ~1.6s so that it knows the app is still running.
-                if (iter % 16 && !frameEv.wait_for(lock, std::chrono::milliseconds(100), [&]{ return frameDirty; }))
+                if (!frameEv.wait_for(lock, std::chrono::milliseconds(1600), [&]{ return frameDirty; }))
                     continue;
                 // TODO apply color offsets
                 for (uint8_t strip = 0; strip < 4; strip++)
@@ -505,9 +506,11 @@ int ui::main() {
 
     DEFER {
         terminate = true;
-        // Must release the locks first to allow the threads to actually check the flag.
+        // Allow the threads to actually read the flag.
         if (videoLock) videoLock.unlock();
         if (audioLock) audioLock.unlock();
+        // Also wake the serial thread so it terminates instantly.
+        updateLocked([&] {});
         videoCaptureThread.join();
         audioCaptureThread.join();
         serialThread.join();
@@ -519,19 +522,20 @@ int ui::main() {
         updateLocked([&] {
             for (auto& strip : frameData)
                 std::fill(std::begin(strip), std::end(strip), 0xFF000000u);
+            size_t w = fake.width, h = fake.height, m = fake.musicLeds;
             // The pattern depicted in screensetup.png.
-            size_t w = fake.width, h = fake.height, m = fake.musicLeds, s = w + h;
             frameData[0][0] = frameData[1][0] = 0xFF00FFFFu;
             frameData[0][w] = frameData[0][w - 1] = 0xFFFFFF00u;
             frameData[1][h] = frameData[1][h - 1] = 0xFFFF00FFu;
-            frameData[0][s - 1] = frameData[1][s - 1] = 0xFFFFFFFFu;
+            frameData[0][w + h - 1] = frameData[1][w + h - 1] = 0xFFFFFFFFu;
+            // TODO maybe render 2 dots on each instead?
             std::fill(frameData[2], frameData[2] + m / 2, 0xFFFFFF00u);
             std::fill(frameData[3], frameData[3] + m / 2, 0xFF00FFFFu);
         });
     };
 
     auto setVideoPattern = [&](uint32_t color) {
-        if (color & 0xFF000000) {
+        if (color & 0xFF000000u) {
             if (!videoLock) videoLock.lock();
             averageColor = color;
             updateLocked([&] {
@@ -551,6 +555,8 @@ int ui::main() {
         setVideoPattern(fake.color);
         if (audioLock) {
             updateLocked([&] {
+                // There's no guarantee that the audio capturer will have anything on first
+                // iteration (might be nothing playing), so clear the test pattern explicitly.
                 std::fill(std::begin(frameData[2]), std::end(frameData[2]), 0xFF000000u);
                 std::fill(std::begin(frameData[3]), std::end(frameData[3]), 0xFF000000u);
             });
@@ -580,21 +586,16 @@ int ui::main() {
         sizingWindow->show();
         setTestPattern();
     }).release();
-    tooltipConfig.onBrightness.add([&](int i, double v) {
-        switch (i) {
-            case 0: fake.brightnessV = v; break;
-            case 1: fake.brightnessA = v; break;
+    tooltipConfig.onChange.add([&](appui::setting s, double v) {
+        switch (s) {
+            case appui::Y: fake.gamma = v; break;
+            case appui::R: fake.dr = v; break;
+            case appui::G: fake.dg = v; break;
+            case appui::B: fake.db = v; break;
+            case appui::Lv: fake.brightnessV = v; break;
+            case appui::La: fake.brightnessA = v; break;
         }
         // Ping the serial thread.
-        updateLocked([&]{ });
-    }).release();
-    tooltipConfig.onGamma.add([&](int i, double v) {
-        switch (i) {
-            case 0: fake.gamma = v; break;
-            case 1: fake.dr = v; break;
-            case 2: fake.dg = v; break;
-            case 3: fake.db = v; break;
-        }
         updateLocked([&]{ });
     }).release();
     tooltipConfig.onColor.add([&](uint32_t c) {
