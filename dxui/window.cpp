@@ -94,6 +94,12 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
         case WM_SIZE:
             window->draw();
             window->onResize();
+            // fallthrough
+        case WM_MOVE:
+            // TODO
+            //   DEVICE_SCALE_FACTOR sf;
+            //   GetScaleFactorForMonitor(MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST), &sf);
+            // Also RegisterScaleChangeEvent
             break;
         case WM_CLOSE:
             if (window->onClose())
