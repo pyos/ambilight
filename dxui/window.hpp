@@ -17,14 +17,7 @@ namespace ui {
     // Get the current Windows 8 theme taskbar color, or 0 if unable to determine.
     uint32_t systemTaskBarColor();
 
-    // A DirectX11 swap chain-backed window. The intended use is as an observer of external
-    // data model updates:
-    //
-    //     auto cursor = ui::loadDefaultCursor();
-    //     auto iconSm = ui::loadSmallIcon(...);
-    //     auto iconLg = ui::loadNormalIcon(...);
-    //     auto window = ui::window{L"unique class name", cursor, igonLg, iconSm, 800, 600};
-    //     window.draw(someWidget);
+    // A DirectX11 swap chain-backed window.
     //
     // NOTE: the window is initially hidden.
     //
