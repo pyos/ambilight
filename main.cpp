@@ -560,7 +560,7 @@ int ui::main() {
         auto h = GetSystemMetrics(SM_CYSCREEN);
         sizingWindow = std::make_unique<ui::window>(800, 800, (w - 800) / 2, (h - 800) / 2);
         sizingWindow->setRoot(&sizingConfig.pad);
-        sizingWindow->setBackground(0xa0000000u, true);
+        sizingWindow->setBackground(0xcc111111u);
         sizingWindow->setShadow(true);
         sizingWindow->show();
         setTestPattern();
