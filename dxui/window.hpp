@@ -8,6 +8,15 @@
 #include <dcomp.h>
 
 namespace ui {
+    // Get the current Windows 8 theme accent color, or 0 if unable to determine.
+    uint32_t systemAccentColor();
+
+    // Get the current Windows 8 theme background color, or 0 if unable to determine.
+    uint32_t systemBackgroundColor();
+
+    // Get the current Windows 8 theme taskbar color, or 0 if unable to determine.
+    uint32_t systemTaskBarColor();
+
     // A DirectX11 swap chain-backed window. The intended use is as an observer of external
     // data model updates:
     //
@@ -70,7 +79,8 @@ namespace ui {
         void setGravity(gravity h, gravity v) { hGravity = h, vGravity = v; }
 
         // Set the background of the window, in ARGB format. Default is white.
-        // Transparent colors use the Windows 10 blur effect.
+        // Transparent colors use the Windows 10 blur effect if possible, else
+        // are made non-transparent.
         void setBackground(uint32_t tint, bool acrylic = false);
 
         // Enable or disable the ability to drag the window by any area that does not

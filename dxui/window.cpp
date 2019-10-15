@@ -60,13 +60,21 @@ typedef struct {
     DWORD AnimationId;
 } ACCENT_POLICY;
 
-using WindowCompositionAttributeFn = BOOL WINAPI(HWND, WINCOMPATTRDATA*);
+template <typename F>
+static F* GetProcAddress(HMODULE hModule, LPCSTR lpProcName) {
+    return reinterpret_cast<F*>(GetProcAddress(hModule, lpProcName));
+}
 
 static HMODULE hUser32 = GetModuleHandle(L"user32.dll");
-static WindowCompositionAttributeFn* GetWindowCompositionAttribute =
-    (WindowCompositionAttributeFn*)GetProcAddress(hUser32, "GetWindowCompositionAttribute");
-static WindowCompositionAttributeFn* SetWindowCompositionAttribute =
-    (WindowCompositionAttributeFn*)GetProcAddress(hUser32, "SetWindowCompositionAttribute");
+static auto GetWindowCompositionAttribute = GetProcAddress<BOOL WINAPI(HWND, WINCOMPATTRDATA*)>(hUser32, "GetWindowCompositionAttribute");
+static auto SetWindowCompositionAttribute = GetProcAddress<BOOL WINAPI(HWND, WINCOMPATTRDATA*)>(hUser32, "SetWindowCompositionAttribute");
+
+static HMODULE hUxTheme = LoadLibrary(L"uxtheme.dll");
+static auto GetImmersiveUserColorSetPreference = GetProcAddress<DWORD(BOOL bForceCheckRegistry, BOOL bSkipCheckOnFail)>(hUxTheme, (LPCSTR)98);
+static auto GetImmersiveColorTypeFromName = GetProcAddress<DWORD(LPCWSTR)>(hUxTheme, (LPCSTR)96);
+static auto GetImmersiveColorFromColorSetEx = GetProcAddress<DWORD(
+    DWORD dwImmersiveColorSet, DWORD dwImmersiveColorType, BOOL bIgnoreHighContrast,
+    DWORD dwHighContrastCacheMode)>(hUxTheme, (LPCSTR)95);
 
 static void applyGravity(ui::window::gravity g, LONG& a, LONG& b, LONG& d) {
     switch (g) {
@@ -132,6 +140,9 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
                 window->drawImmediate(scheduled);
             break;
         }
+        case WM_SETTINGCHANGE:
+            if (lParam && wcscmp((LPCWSTR)lParam, L"ImmersiveColorSet") == 0)
+                window->draw();
         case WM_NCCALCSIZE:
             return 0;
         case WM_USER: switch (LOWORD(lParam)) {
@@ -225,12 +236,36 @@ void ui::window::drawImmediate(RECT scheduled) {
     winapi::throwOnFalse(swapChain->Present(1, 0));
 }
 
+static uint32_t immersiveColor(LPCWSTR name) {
+    if (!GetImmersiveUserColorSetPreference || !GetImmersiveColorTypeFromName || !GetImmersiveColorFromColorSetEx)
+        return 0;
+    auto colorSet = GetImmersiveUserColorSetPreference(FALSE, FALSE);
+    auto colorType = GetImmersiveColorTypeFromName(name);
+    auto abgr = GetImmersiveColorFromColorSetEx(colorSet, colorType, FALSE, 0);
+    return abgr & 0xFF00FF00u | (abgr & 0xFF0000u) >> 16 | (abgr & 0xFFu) << 16;
+}
+
+uint32_t ui::systemAccentColor() {
+    return immersiveColor(L"ImmersiveSystemAccent");
+}
+
+uint32_t ui::systemBackgroundColor() {
+    return immersiveColor(L"ImmersiveApplicationBackground");
+}
+
+uint32_t ui::systemTaskBarColor() {
+    return immersiveColor(L"ImmersiveSystemBackground");
+}
+
 void ui::window::setBackground(uint32_t tint, bool acrylic) {
+    if (!SetWindowCompositionAttribute) {
+        background = tint | 0xFF000000u;
+        return;
+    }
     ACCENT_POLICY ap = {};
     if ((tint >> 24) != 0xFF) {
         ap.AccentState = acrylic ? ACCENT_ENABLE_ACRYLICBLURBEHIND : ACCENT_ENABLE_BLURBEHIND;
         ap.AccentFlags = 2;
-        // This value should be ABGR, not ARGB.
         ap.GradientColor = tint & 0xFF00FF00u | (tint & 0xFF) << 16 | (tint & 0xFF0000) >> 16;
         background = 0;
     } else {
