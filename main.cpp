@@ -472,15 +472,15 @@ int ui::main() {
         auto filename = L"\\\\.\\COM" + std::to_wstring(port);
         serial comm{filename.c_str()};
         while (port == fake.serial && !terminate) {
-            if (auto lock = std::unique_lock<std::mutex>(mut)) {
-                // Ping the arduino at least once per ~2s so that it knows the app is still running.
-                if (!frameEv.wait_for(lock, std::chrono::seconds(2), [&]{ return frameDirty; }))
-                    continue;
-                // TODO apply color offsets
-                for (uint8_t strip = 0; strip < 4; strip++)
-                    comm.update(strip, frameData[strip], fake.gamma, strip < 2 ? fake.brightnessV : fake.brightnessA);
-                frameDirty = false;
-            }
+            std::unique_lock<std::mutex> lock{mut};
+            // Ping the arduino at least once per ~2s so that it knows the app is still running.
+            if (!frameEv.wait_for(lock, std::chrono::seconds(2), [&]{ return frameDirty; }))
+                continue;
+            // TODO apply color offsets
+            for (uint8_t strip = 0; strip < 4; strip++)
+                comm.update(strip, frameData[strip], fake.gamma, strip < 2 ? fake.brightnessV : fake.brightnessA);
+            frameDirty = false;
+            lock.unlock();
             comm.submit();
         }
     });
