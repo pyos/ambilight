@@ -19,14 +19,6 @@ namespace ui {
     // can be resized.
     //
     struct grid : widget {
-        grid(size_t cols /* > 0 */, size_t rows /* > 0 */)
-            : cells(cols * rows)
-            , align(cols * rows)
-            , cols(cols)
-            , rows(rows)
-        {
-        }
-
         // Alignment rules, used when a widget is smaller than the stretchy cell
         // it is inserted into:
         //     align_start           Top or left
@@ -34,6 +26,14 @@ namespace ui {
         //     align_global_center   Point closest to the center of the entire grid
         //     align_end             Bottom or right
         enum alignment { align_start, align_center, align_global_center, align_end };
+
+        grid(size_t cols /* > 0 */, size_t rows /* > 0 */)
+            : cells(cols * rows)
+            , align(cols * rows, {align_center, align_center})
+            , cols(cols)
+            , rows(rows)
+        {
+        }
 
         void set(size_t x /* < cols */, size_t y /* < rows */, widget* child,
                  alignment h = align_center, alignment v = align_center) {
