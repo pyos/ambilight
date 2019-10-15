@@ -137,6 +137,10 @@ namespace ui {
             return cachedTexture((uintptr_t)F, [this]{ return F(*this); });
         }
 
+        winapi::com_ptr<ID3D11Texture2D> nullTexture() {
+            return cachedTexture(0, [this]{ return textureFromRaw({0, 0, 0, 0}, 1); });
+        }
+
     private:
         winapi::com_ptr<ID3D11Buffer> buffer(util::span<const uint8_t> contents, int bindFlags) {
             D3D11_BUFFER_DESC bufferDesc = {};
