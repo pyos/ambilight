@@ -147,7 +147,7 @@ namespace appui {
     // +---------------------------------+
     // |                                 |
     // |       [image of a screen]       |
-    // |       [with rgb corners ]       |
+    // |       [with CMYW corners]       |
     // |                                 |
     // |  Width [-] ---|---------- [+] 1 |
     // | Height [-] ---|---------- [+] 2 |
@@ -158,10 +158,7 @@ namespace appui {
         sizing_config(const state& init)
             : padded<ui::grid>({20, 20}, 1, 4)
         {
-            set(0, 0, &image);
-            set(0, 1, &sliderGrid.pad);
-            set(0, 2, &helpLabel.pad);
-            set(0, 3, &bottomRow.pad);
+            set({&image, &sliderGrid.pad, &helpLabel.pad, &bottomRow.pad});
             setPrimaryCell(0, 0);
             sliderGrid.set(4, 3, &constNumWidth);
             sliderGrid.setColStretch(2, 1);
@@ -236,14 +233,10 @@ namespace appui {
             : onChange(onChange)
         {
             setContents(&grid.pad);
-            grid.set(0, 0, &yLabel.pad);
-            grid.set(0, 1, &rLabel.pad);
-            grid.set(0, 2, &gLabel.pad);
-            grid.set(0, 3, &bLabel.pad);
-            grid.set(1, 0, &ySlider.pad);
-            grid.set(1, 1, &rSlider.pad);
-            grid.set(1, 2, &gSlider.pad);
-            grid.set(1, 3, &bSlider.pad);
+            grid.set({&yLabel.pad, &ySlider.pad,
+                      &rLabel.pad, &rSlider.pad,
+                      &gLabel.pad, &gSlider.pad,
+                      &bLabel.pad, &bSlider.pad});
             grid.setColStretch(1, 1);
             ySlider.setValue((init.gamma - 1) / 2); // use gamma from 1 to 3
             rSlider.setValue(init.dr);
@@ -273,8 +266,7 @@ namespace appui {
             : onChange(onChange)
         {
             setContents(&grid.pad);
-            grid.set(0, 0, &hueSlider.pad);
-            grid.set(0, 1, &satSlider.pad);
+            grid.set({&hueSlider.pad, &satSlider.pad});
             grid.setColStretch(0, 1);
             auto [a, h, s, v] = argb2ahsv(u2qd(init.color));
             hueSlider.setValue(h);
@@ -309,20 +301,15 @@ namespace appui {
             set(0, 4, &buttons);
             setColStretch(0, 1);
 
-            buttons.set(0, 0, &gammaBg);
-            buttons.set(1, 0, &colorBg);
-            buttons.set(3, 0, &sButton);
-            buttons.set(4, 0, &qButton);
+            buttons.set({&gammaBg, &colorBg, nullptr, &sButton, &qButton});
             buttons.setColStretch(2, 1);
             sButton.setBorderless(true);
             qButton.setBorderless(true);
             gammaButton.setBorderless(true);
             colorButton.setBorderless(true);
 
-            brightnessGrid.set(0, 0, &bLabel.pad);
-            brightnessGrid.set(1, 0, &bSlider.pad);
-            brightnessGrid.set(0, 1, &mLabel.pad);
-            brightnessGrid.set(1, 1, &mSlider.pad);
+            brightnessGrid.set({&bLabel.pad, &bSlider.pad,
+                                &mLabel.pad, &mSlider.pad});
             brightnessGrid.setColStretch(1, 1);
             bSlider.setValue(init.brightnessV);
             mSlider.setValue(init.brightnessA);

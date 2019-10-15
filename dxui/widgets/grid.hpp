@@ -37,8 +37,15 @@ namespace ui {
 
         void set(size_t x /* < cols */, size_t y /* < rows */, widget* child,
                  alignment h = align_center, alignment v = align_center) {
-            cells[x * rows.size() + y] = widget_handle{child, *this};
-            align[x * rows.size() + y] = {h, v};
+            cells[y * cols.size() + x] = widget_handle{child, *this};
+            align[y * cols.size() + x] = {h, v};
+            invalidateSize();
+        }
+
+        void set(std::initializer_list<widget*> all /* = rows.size() * cols.size() */) {
+            size_t i = 0;
+            for (auto& w : all)
+                cells[i++] = widget_handle{w, *this};
             invalidateSize();
         }
 

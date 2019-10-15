@@ -21,8 +21,8 @@ RECT ui::grid::itemRect(size_t x, size_t y, size_t i, POINT origin) const {
 POINT ui::grid::measureMinImpl() const {
     for (auto& c : cols) c.min = 0;
     for (auto& r : rows) r.min = 0;
-    for (size_t x = 0, i = 0; x < cols.size(); x++) {
-        for (size_t y = 0; y < rows.size(); y++, i++) if (cells[i]) {
+    for (size_t y = 0, i = 0; y < rows.size(); y++) {
+        for (size_t x = 0; x < cols.size(); x++, i++) if (cells[i]) {
             auto [w, h] = cells[i]->measureMin();
             cols[x].min = std::max(cols[x].min, w);
             rows[y].min = std::max(rows[y].min, h);
@@ -61,7 +61,7 @@ POINT ui::grid::measureImpl(POINT fit) const {
     if ((remaining.x || remaining.y) && primary.first && primary.second) {
         auto& c = cols[primary.first - 1];
         auto& r = rows[primary.second - 1];
-        if (auto& item = cells[(primary.first - 1) * rows.size() + (primary.second - 1)]) {
+        if (auto& item = cells[(primary.first - 1) + (primary.second - 1) * cols.size()]) {
             auto [w, h] = item->measure({remaining.x + c.size, remaining.y + r.size});
             c.size = w;
             r.size = h;
@@ -77,8 +77,8 @@ POINT ui::grid::measureImpl(POINT fit) const {
 void ui::grid::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
     // Fill `c` and `r` with the correct values for `start` and `end`.
     measure({total.right - total.left, total.bottom - total.top});
-    for (size_t x = 0, i = 0; x < cols.size(); x++) {
-        for (size_t y = 0; y < rows.size(); y++, i++) if (cells[i]) {
+    for (size_t y = 0, i = 0; y < rows.size(); y++) {
+        for (size_t x = 0; x < cols.size(); x++, i++) if (cells[i]) {
             auto itemArea = itemRect(x, y, i, {total.left, total.top});
             auto itemDirty = rectIntersection(itemArea, dirty);
             // Due to the row/column sizing rules, repainting one item never makes it necessary
@@ -95,11 +95,9 @@ bool ui::grid::onMouse(POINT abs, int keys) {
     if (cols[0].start <= rel.x && rows[0].start <= rel.y) {
         auto ci = std::upper_bound(cols.begin(), cols.end(), rel.x, [](LONG x, auto& c) { return x < c.start; });
         auto ri = std::upper_bound(rows.begin(), rows.end(), rel.y, [](LONG y, auto& r) { return y < r.start; });
-        auto x = std::distance(cols.begin(), ci) - 1;
-        auto y = std::distance(rows.begin(), ri) - 1;
-        if ((target = cells[x * rows.size() + y].get()))
-            if (!rectHit(itemRect(x, y, x * rows.size() + y), rel))
-                target = nullptr; // Hit the cell, but not the widget.
+        size_t x = ci - cols.begin() - 1, y = ri - rows.begin() - 1, i = y * cols.size() + x;
+        if ((target = cells[i].get()) && !rectHit(itemRect(x, y, i), rel))
+            target = nullptr; // Hit the cell, but not the widget.
     }
     if (lastMouseEvent && lastMouseEvent != target)
         lastMouseEvent->onMouseLeave();
