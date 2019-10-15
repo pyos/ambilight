@@ -472,8 +472,8 @@ int ui::main() {
         serial comm{filename.c_str()};
         while (port == fake.serial && !terminate) {
             if (auto lock = std::unique_lock<std::mutex>(mut)) {
-                // Ping the arduino at least once per ~1.6s so that it knows the app is still running.
-                if (!frameEv.wait_for(lock, std::chrono::milliseconds(1600), [&]{ return frameDirty; }))
+                // Ping the arduino at least once per ~2s so that it knows the app is still running.
+                if (!frameEv.wait_for(lock, std::chrono::seconds(2), [&]{ return frameDirty; }))
                     continue;
                 // TODO apply color offsets
                 for (uint8_t strip = 0; strip < 4; strip++)
