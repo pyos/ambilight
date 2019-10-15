@@ -60,10 +60,10 @@ namespace ui {
         void move(RECT p) { MoveWindow(*this, p.left, p.top, p.right - p.left, p.bottom - p.top, TRUE); }
 
         // Whether the window is visible, i.e. not hidden or minimized.
-        bool isVisible() { return IsWindowVisible(*this); }
+        bool isVisible() const { return IsWindowVisible(*this); }
 
         // Whether this window is maximized, duh.
-        bool isMaximized() { return IsZoomed(*this); }
+        bool isMaximized() const { return IsZoomed(*this); }
 
         // Set the window title.
         void setTitle(const wchar_t* value) { winapi::throwOnFalse(SetWindowText(*this, value)); }
@@ -106,6 +106,12 @@ namespace ui {
         void onMouse(POINT abs, int keys);
         void onMouseLeave();
 
+        void captureMouse(widget& target) {
+            // assert(!mouseCapture);
+            mouseCapture = &target;
+            SetCapture(*this);
+        }
+
     public:
         // Fired when the window becomes visible because of a call to `show()` or because
         // the user has unminimized it.
@@ -138,11 +144,7 @@ namespace ui {
         void onChildRelease(widget& w) override { setRoot(nullptr); }
         void onChildRedraw(widget&, RECT area) override { draw(area); }
         void onChildResize(widget&) override { draw(); }
-        void onMouseCapture(widget& target) override {
-            // assert(!mouseCapture);
-            mouseCapture = &target;
-            SetCapture(*this);
-        }
+        window* parentWindow() override { return this; }
 
         struct release_notify_icon {
             void operator()(NOTIFYICONDATA* nid) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../widget.hpp"
+#include "../window.hpp"
 
 namespace ui {
     // Also known as a "trackbar", this is just a knob on a rail:
@@ -58,7 +59,7 @@ namespace ui {
             switch (cap.update(keys)) {
                 case capture_state::ignore:
                 case capture_state::prepare: return false;
-                case capture_state::capture: captureMouse(); break;
+                case capture_state::capture: if (auto w = parentWindow()) w->captureMouse(*this); break;
                 case capture_state::release: keepCapturing = false; break;
             }
             auto [w, h] = measureMin();

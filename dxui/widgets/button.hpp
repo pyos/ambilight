@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../widget.hpp"
+#include "../window.hpp"
 #include "texrect.hpp"
 
 namespace ui {
@@ -18,7 +18,7 @@ namespace ui {
             switch (cap.update(keys)) {
                 case capture_state::ignore:  return false;
                 case capture_state::prepare: setState(hover); return false;
-                case capture_state::capture: setState(active); captureMouse(); return true;
+                case capture_state::capture: setState(active); if (auto w = parentWindow()) w->captureMouse(*this); return true;
                 case capture_state::drag:    setState(hovering ? active : idle); return true;
                 // Unconditionally switching to `idle` even when hovering over the button
                 // gives a little feedback that the click was actually registered.

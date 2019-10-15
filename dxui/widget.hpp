@@ -7,12 +7,13 @@
 #include "event.hpp"
 
 namespace ui {
+    struct window;
     struct widget;
     struct widget_parent {
         virtual void onChildRelease(widget&) = 0;
         virtual void onChildRedraw(widget&, RECT) = 0;
         virtual void onChildResize(widget&) = 0;
-        virtual void onMouseCapture(widget&) = 0;
+        virtual window* parentWindow() = 0;
     };
 
     struct widget : widget_parent {
@@ -79,8 +80,8 @@ namespace ui {
             invalidateSize();
         }
 
-        void onMouseCapture(widget& w) override {
-            if (parent) parent->onMouseCapture(w);
+        window* parentWindow() override {
+            return parent ? parent->parentWindow() : nullptr;
         }
 
         virtual bool onMouse(POINT abs, int keys) { return false; }
@@ -104,16 +105,6 @@ namespace ui {
             lastMeasureMin = {-1, -1};
             lastMeasureArg = {-1, -1};
             if (parent) parent->onChildResize(*this);
-        }
-
-        // Begin capturing the pointer into this widget. The capture is released
-        // the first time the widget refuses to capture a mouse event, i.e. returns
-        // `false` from `onMouse`.
-        //
-        // NOTE: releasing the pointer while it's outside the widget's boundaries
-        //       does not send an `onMouseLeave` message until the next mouse action.
-        void captureMouse() {
-            if (parent) parent->onMouseCapture(*this);
         }
 
         // Map a point from window coordinates to widget coordinates, which are just
@@ -163,7 +154,7 @@ namespace ui {
         // Call this in the widget's `onMouse` handler. Return values:
         //     ignore     hovering with a button held from outside
         //     prepare    hovering with no buttons held
-        //     capture    pressed a button, call `captureMouse()` and return `true`
+        //     capture    pressed a button, call `parentWindow()->captureMouse()` and return `true`
         //     drag       still holding a button, keep returning `true`
         //     release    released all buttons, return `false`
         enum { ignore, prepare, capture, drag, release } update(int keys) {
