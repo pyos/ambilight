@@ -67,13 +67,7 @@ private:
     }
 
 private:
-    struct close_handle {
-        void operator()(HANDLE h) {
-            CloseHandle(h);
-        }
-    };
-
-    std::unique_ptr<void, close_handle> handle;
+    ui::impl::holder<HANDLE, CloseHandle> handle;
     LED  color[4][AMBILIGHT_CHUNKS_PER_STRIP][AMBILIGHT_SERIAL_CHUNK] = {};
     bool valid[4][AMBILIGHT_CHUNKS_PER_STRIP] = {};
 };
