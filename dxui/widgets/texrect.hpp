@@ -3,7 +3,6 @@
 #include "../widget.hpp"
 
 namespace ui {
-
     enum builtin_rect {
         BUTTON_OUTER,
         BUTTON_OUTER_HOVER,

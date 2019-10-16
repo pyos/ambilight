@@ -24,9 +24,7 @@ namespace ui {
             }                                                                           \
         }                                                                               \
     private:                                                                            \
-        struct icon : texrect {                                                         \
-            RECT getOuter() const override { return builtinRect(iconRect); }            \
-        } icon;                                                                         \
+        image<builtinTexture> icon{builtinRect(iconRect)};                              \
     }
 
     DXUI_GENERATE_BUTTON(win_close, WIN_CLOSE, WIN_ICON_CLOSE,
