@@ -72,8 +72,6 @@ namespace appui {
                 grid.set(2, row, &numLabel);
             }
             grid.set(3, row, &incButton.pad);
-            decButton.setBorderless(true);
-            incButton.setBorderless(true);
             decButton.onClick.addForever([=]{ setValue(value() - step); return onChange(value()); });
             incButton.onClick.addForever([=]{ setValue(value() + step); return onChange(value()); });
             slider.onChange.addForever([=](double) { setValue(value()); return onChange(value()); });
@@ -98,8 +96,8 @@ namespace appui {
         ui::label numLabel{{{L"", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
         ui::label decLabel{{{L"\uf068", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
         ui::label incLabel{{{L"\uf067", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
-        padded<ui::button> decButton{{5, 0}, decLabel};
-        padded<ui::button> incButton{{5, 0}, incLabel};
+        padded<ui::borderless_button> decButton{{5, 0}, decLabel};
+        padded<ui::borderless_button> incButton{{5, 0}, incLabel};
         ui::slider slider;
         std::wstring numBuffer;
     };
@@ -298,10 +296,6 @@ namespace appui {
 
             buttons.set({&gammaBg, &colorBg, nullptr, &sButton, &qButton});
             buttons.setColStretch(2, 1);
-            sButton.setBorderless(true);
-            qButton.setBorderless(true);
-            gammaButton.setBorderless(true);
-            colorButton.setBorderless(true);
 
             brightnessGrid.set({&bLabel.pad, &bSlider.pad,
                                 &mLabel.pad, &mSlider.pad});
@@ -336,10 +330,10 @@ namespace appui {
         padded_label colorLabel{{5, 5}, {L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         padded_label sLabel{{5, 5}, {L"\uf013", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         padded_label qLabel{{5, 5}, {L"\uf011", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        ui::button gammaButton{gammaLabel.pad};
-        ui::button colorButton{colorLabel.pad};
-        ui::button sButton{sLabel.pad};
-        ui::button qButton{qLabel.pad};
+        ui::borderless_button gammaButton{gammaLabel.pad};
+        ui::borderless_button colorButton{colorLabel.pad};
+        ui::borderless_button sButton{sLabel.pad};
+        ui::borderless_button qButton{qLabel.pad};
         gray_bg gammaBg{gammaButton};
         gray_bg colorBg{colorButton};
 

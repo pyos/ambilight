@@ -32,11 +32,6 @@ namespace ui {
             setState(idle);
         }
 
-        void setBorderless(bool value = true) {
-            borderless = value;
-            invalidate();
-        }
-
     public:
         // Emitted when the left mouse button is released over this widget.
         util::event<> onClick;
@@ -47,17 +42,17 @@ namespace ui {
 
         RECT getOuter() const override {
             switch (getState()) {
-            default:     return builtinRect(borderless ? BUTTON_BORDERLESS_OUTER : BUTTON_OUTER);
-            case hover:  return builtinRect(borderless ? BUTTON_BORDERLESS_OUTER_HOVER : BUTTON_OUTER_HOVER);
-            case active: return builtinRect(borderless ? BUTTON_BORDERLESS_OUTER_ACTIVE : BUTTON_OUTER_ACTIVE);
+            default:     return builtinRect(BUTTON_OUTER);
+            case hover:  return builtinRect(BUTTON_OUTER_HOVER);
+            case active: return builtinRect(BUTTON_OUTER_ACTIVE);
             }
         }
 
         RECT getInner() const override {
             switch (getState()) {
-            default:     return builtinRect(borderless ? BUTTON_BORDERLESS_INNER : BUTTON_INNER);
-            case hover:  return builtinRect(borderless ? BUTTON_BORDERLESS_INNER_HOVER : BUTTON_INNER_HOVER);
-            case active: return builtinRect(borderless ? BUTTON_BORDERLESS_INNER_ACTIVE : BUTTON_INNER_ACTIVE);
+            default:     return builtinRect(BUTTON_INNER);
+            case hover:  return builtinRect(BUTTON_INNER_HOVER);
+            case active: return builtinRect(BUTTON_INNER_ACTIVE);
             }
         }
 
@@ -70,6 +65,26 @@ namespace ui {
     private:
         state currentState = idle;
         capture_state cap;
-        bool borderless = false;
+    };
+
+    struct borderless_button : button {
+        using button::button;
+
+    protected:
+        RECT getOuter() const override {
+            switch (getState()) {
+            default:     return builtinRect(BUTTON_BORDERLESS_OUTER);
+            case hover:  return builtinRect(BUTTON_BORDERLESS_OUTER_HOVER);
+            case active: return builtinRect(BUTTON_BORDERLESS_OUTER_ACTIVE);
+            }
+        }
+
+        RECT getInner() const override {
+            switch (getState()) {
+            default:     return builtinRect(BUTTON_BORDERLESS_INNER);
+            case hover:  return builtinRect(BUTTON_BORDERLESS_INNER_HOVER);
+            case active: return builtinRect(BUTTON_BORDERLESS_INNER_ACTIVE);
+            }
+        }
     };
 }
