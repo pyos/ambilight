@@ -22,18 +22,14 @@ namespace winapi {
 
     template <typename T>
     static T throwOnFalse(T&& x) {
-        if (!x) {
-            // TODO GetLastError() and such
-            throw std::exception();
-        }
+        if (!x)
+            throw error(HRESULT_FROM_WIN32(GetLastError()), ""); // TODO text
         return std::forward<T>(x);
     }
 
     static HRESULT throwOnFalse(HRESULT x) {
-        if (FAILED(x)) {
-            // TODO
-            throw std::exception();
-        }
+        if (FAILED(x))
+            throw error(x, ""); // TODO text
         return x;
     }
 
