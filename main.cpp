@@ -635,6 +635,7 @@ int ui::main() {
         tooltipWindow->setRoot(&tooltipConfig);
         tooltipWindow->setTopmost(true);
         tooltipWindow->show();
+        tooltipWindow->focus();
     });
 
     if (!initialized)
