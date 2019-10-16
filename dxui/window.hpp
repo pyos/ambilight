@@ -140,6 +140,10 @@ namespace ui {
         // for the primary action, or a right click or keyboard selection for the secondary.
         util::event<POINT, bool /* primary */> onNotificationIcon;
 
+        // Fired when the system theme colors changes. Default action is to redraw
+        // all widgets.
+        util::event<> onSystemColorsChange;
+
     private:
         void onChildRelease(widget& w) override { setRoot(nullptr); }
         void onChildRedraw(widget&, RECT area) override { draw(area); }

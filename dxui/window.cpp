@@ -147,8 +147,9 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
             break;
         }
         case WM_SETTINGCHANGE:
-            if (lParam && wcscmp((LPCWSTR)lParam, L"ImmersiveColorSet") == 0)
+            if (lParam && wcscmp((LPCWSTR)lParam, L"ImmersiveColorSet") == 0 && !window->onSystemColorsChange())
                 window->draw();
+            break;
         case WM_NCCALCSIZE:
             return 0;
         case WM_USER: switch (LOWORD(lParam)) {
