@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../widget.hpp"
+#include "texrect.hpp"
 #include "../window.hpp"
 
 namespace ui {
@@ -78,16 +78,27 @@ namespace ui {
         util::event<double> onChange;
 
     protected:
-        virtual winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const;
-        virtual RECT getTrack() const;
-        virtual RECT getGroove() const;
+        virtual winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const {
+            return ctx.cachedTexture<builtinTexture>(); }
+        virtual RECT getTrack() const { return builtinRect(SLIDER_TRACK); }
+        virtual RECT getGroove() const { return builtinRect(SLIDER_GROOVE); }
 
     private:
         bool vertical() const { return currentOrientation == deg90  || currentOrientation == deg270; }
         bool inverted() const { return currentOrientation == deg180 || currentOrientation == deg270; }
-        POINT measureMinImpl() const override;
-        POINT measureImpl(POINT fit) const override;
         void drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override;
+
+        POINT measureMinImpl() const override {
+            auto ts = getTrack();
+            return {vertical() ? ts.bottom - ts.top : ts.right - ts.left,
+                    vertical() ? ts.right - ts.left : ts.bottom - ts.top};
+        }
+
+        POINT measureImpl(POINT fit) const override {
+            auto ts = getTrack();
+            return {vertical() ? ts.bottom - ts.top : fit.x,
+                    vertical() ? fit.y : ts.bottom - ts.top};
+        }
 
     private:
         double value_;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <initializer_list>
+
 namespace util {
     template <typename T>
     // A stripped down `std::span<T>`.

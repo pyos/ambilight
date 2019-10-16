@@ -1,29 +1,4 @@
 #include "slider.hpp"
-#include "data.hpp"
-
-POINT ui::slider::measureMinImpl() const {
-    auto ts = builtinRect(SLIDER_TRACK);
-    return {vertical() ? ts.bottom - ts.top : ts.right - ts.left,
-            vertical() ? ts.right - ts.left : ts.bottom - ts.top};
-}
-
-POINT ui::slider::measureImpl(POINT fit) const {
-    auto ts = builtinRect(SLIDER_TRACK);
-    return {vertical() ? ts.bottom - ts.top : fit.x,
-            vertical() ? fit.y : ts.bottom - ts.top};
-}
-
-winapi::com_ptr<ID3D11Texture2D> ui::slider::getTexture(ui::dxcontext& ctx) const {
-    return ctx.cachedTexture<builtinTexture>();
-}
-
-RECT ui::slider::getTrack() const {
-    return builtinRect(SLIDER_TRACK);
-}
-
-RECT ui::slider::getGroove() const {
-    return builtinRect(SLIDER_GROOVE);
-}
 
 void ui::slider::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
     auto gs = getGroove();

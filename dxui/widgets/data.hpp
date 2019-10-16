@@ -1,8 +1,7 @@
 #pragma once
 
-#include "../draw.hpp"
 #include "../span.hpp"
-#include "../resource.hpp"
+#include <cctype>
 
 namespace ui {
     template <typename T, typename F>
@@ -41,41 +40,4 @@ namespace ui {
             f(lineno - skipped, stripped);
         });
     }
-
-    enum builtin_rect {
-        BUTTON_OUTER,
-        BUTTON_OUTER_HOVER,
-        BUTTON_OUTER_ACTIVE,
-        BUTTON_INNER,
-        BUTTON_INNER_HOVER,
-        BUTTON_INNER_ACTIVE,
-        BUTTON_BORDERLESS_OUTER,
-        BUTTON_BORDERLESS_OUTER_HOVER,
-        BUTTON_BORDERLESS_OUTER_ACTIVE,
-        BUTTON_BORDERLESS_INNER,
-        BUTTON_BORDERLESS_INNER_HOVER,
-        BUTTON_BORDERLESS_INNER_ACTIVE,
-        SLIDER_TRACK,
-        SLIDER_GROOVE,
-        WIN_CLOSE_OUTER,
-        WIN_CLOSE_OUTER_HOVER,
-        WIN_CLOSE_OUTER_ACTIVE,
-        WIN_CLOSE_INNER,
-        WIN_CLOSE_INNER_HOVER,
-        WIN_CLOSE_INNER_ACTIVE,
-        WIN_FRAME_OUTER,
-        WIN_FRAME_OUTER_HOVER,
-        WIN_FRAME_OUTER_ACTIVE,
-        WIN_FRAME_INNER,
-        WIN_FRAME_INNER_HOVER,
-        WIN_FRAME_INNER_ACTIVE,
-        WIN_ICON_CLOSE,
-        WIN_ICON_MAXIMIZE,
-        WIN_ICON_UNMAXIMIZE,
-        WIN_ICON_MINIMIZE,
-        BUILTIN_RECT_COUNT
-    };
-
-    winapi::com_ptr<ID3D11Texture2D> builtinTexture(ui::dxcontext&);
-    RECT builtinRect(builtin_rect);
 }
