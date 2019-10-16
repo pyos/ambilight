@@ -346,15 +346,40 @@ namespace appui {
 }
 
 int ui::main() {
+    bool initialized = false;
+    appui::state defaultConfig = {16, 9, 20, 3, 0.7, 0.4, 2.0, 1.0, 1.0, 1.0, 0x00FFFFFFu};
+    appui::state config;
+
+    wchar_t configPath[MAX_PATH];
+    size_t i = winapi::throwOnFalse(GetModuleFileName(nullptr, configPath, MAX_PATH));
+    configPath[--i] = 'g';
+    configPath[--i] = 'f';
+    configPath[--i] = 'c';
+    try {
+        DWORD result;
+        ui::impl::holder<HANDLE, CloseHandle> file{
+            CreateFile(configPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)};
+        winapi::throwOnFalse(file);
+        winapi::throwOnFalse(ReadFile(file.get(), &config, sizeof(config), &result, nullptr) && result == sizeof(config));
+        initialized = true;
+    } catch (const std::exception&) {
+        memcpy(&config, &defaultConfig, sizeof(config));
+    }
+
     ui::window mainWindow{1, 1};
     mainWindow.setTitle(L"Ambilight");
-    mainWindow.onDestroy.addForever([&] { ui::quit(); });
+    mainWindow.onDestroy.addForever([&] {
+        DWORD result;
+        if (ui::impl::holder<HANDLE, CloseHandle> file{
+                CreateFile(configPath, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0)})
+            WriteFile(file.get(), &config, sizeof(config), &result, nullptr);
+        ui::quit();
+    });
+
     std::unique_ptr<ui::window> sizingWindow;
     std::unique_ptr<ui::window> tooltipWindow;
-    // TODO load from file
-    appui::state fake = {72, 40, 76, 3, 0.7, 0.4, 2.0, 1.0, 1.0, 1.0, 0x00FFFFFFu};
-    appui::sizing_config sizingConfig{fake};
-    appui::tooltip_config tooltipConfig{fake};
+    appui::sizing_config sizingConfig{config};
+    appui::tooltip_config tooltipConfig{config};
 
     std::atomic<bool> terminate{false};
     // These more granular mutexes (mutices?) synchronize writes to each pair of strips
@@ -374,7 +399,7 @@ int ui::main() {
     std::mutex mut;
     std::condition_variable frameEv;
 
-    std::atomic<uint32_t> averageColor = fake.color;
+    std::atomic<uint32_t> averageColor = config.color;
     bool frameDirty = false;
     UINT frameData[4][AMBILIGHT_CHUNKS_PER_STRIP * AMBILIGHT_SERIAL_CHUNK] = {};
 
@@ -403,8 +428,8 @@ int ui::main() {
     auto videoCaptureThread = loopThread([&] {
         // Wait until the main thread allows capture threads to proceed.
         { std::unique_lock<std::timed_mutex> lk(videoMutex); };
-        size_t w = fake.width;
-        size_t h = fake.height;
+        size_t w = config.width;
+        size_t h = config.height;
         auto cap = captureScreen(0, w, h);
         while (!terminate) if (auto in = cap->next()) {
             int32_t averageComponents[4] = {0, 0, 0, 0};
@@ -447,7 +472,7 @@ int ui::main() {
             if (!lk)
                 return;
             updateLocked([&] {
-                size_t j = 0, size = fake.musicLeds / 2;
+                size_t j = 0, size = config.musicLeds / 2;
                 for (auto* out : {frameData[2], frameData[3]}) {
                     size_t i = 0;
                     for (size_t k = in.size() / 2; k--; j++)
@@ -462,16 +487,16 @@ int ui::main() {
     });
 
     auto serialThread = loopThread([&] {
-        auto port = fake.serial.load();
+        auto port = config.serial.load();
         auto filename = L"\\\\.\\COM" + std::to_wstring(port);
         serial comm{filename.c_str()};
-        while (port == fake.serial && !terminate) {
+        while (port == config.serial && !terminate) {
             std::unique_lock<std::mutex> lock{mut};
             // Ping the arduino at least once per ~2s so that it knows the app is still running.
             if (frameEv.wait_for(lock, std::chrono::seconds(2), [&]{ return frameDirty; })) {
                 // TODO apply color offsets
                 for (uint8_t strip = 0; strip < 4; strip++)
-                    comm.update(strip, frameData[strip], fake.gamma, strip < 2 ? fake.brightnessV : fake.brightnessA);
+                    comm.update(strip, frameData[strip], config.gamma, strip < 2 ? config.brightnessV : config.brightnessA);
                 frameDirty = false;
             }
             lock.unlock();
@@ -497,7 +522,7 @@ int ui::main() {
         updateLocked([&] {
             for (auto& strip : frameData)
                 std::fill(std::begin(strip), std::end(strip), 0xFF000000u);
-            size_t w = fake.width, h = fake.height, m = fake.musicLeds;
+            size_t w = config.width, h = config.height, m = config.musicLeds;
             // The pattern depicted in screensetup.png.
             frameData[0][0] = frameData[1][0] = 0xFF00FFFFu;
             frameData[0][w] = frameData[0][w - 1] = 0xFFFFFF00u;
@@ -514,7 +539,7 @@ int ui::main() {
             if (!videoLock) videoLock.lock();
             averageColor = color;
             updateLocked([&] {
-                size_t s = fake.width + fake.height;
+                size_t s = config.width + config.height;
                 std::fill(frameData[0], frameData[0] + s, color);
                 std::fill(frameData[1], frameData[1] + s, color);
             });
@@ -525,7 +550,7 @@ int ui::main() {
 
     auto setBothPatterns = [&] {
         mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
-        setVideoPattern(fake.color);
+        setVideoPattern(config.color);
         if (audioLock) {
             updateLocked([&] {
                 // There's no guarantee that the audio capturer will have anything on first
@@ -540,10 +565,10 @@ int ui::main() {
     sizingConfig.onDone.addForever([&] { sizingWindow->close(); });
     sizingConfig.onChange.addForever([&](int i, size_t value) {
         switch (i) {
-            case 0: fake.width = value; break;
-            case 1: fake.height = value; break;
-            case 2: fake.musicLeds = value; break;
-            case 3: fake.serial = value; break;
+            case 0: config.width = value; break;
+            case 1: config.height = value; break;
+            case 2: config.musicLeds = value; break;
+            case 3: config.serial = value; break;
         }
         setTestPattern();
     });
@@ -564,18 +589,18 @@ int ui::main() {
     });
     tooltipConfig.onChange.addForever([&](appui::setting s, double v) {
         switch (s) {
-            case appui::Y: fake.gamma = v; break;
-            case appui::R: fake.dr = v; break;
-            case appui::G: fake.dg = v; break;
-            case appui::B: fake.db = v; break;
-            case appui::Lv: fake.brightnessV = v; break;
-            case appui::La: fake.brightnessA = v; break;
+            case appui::Y: config.gamma = v; break;
+            case appui::R: config.dr = v; break;
+            case appui::G: config.dg = v; break;
+            case appui::B: config.db = v; break;
+            case appui::Lv: config.brightnessV = v; break;
+            case appui::La: config.brightnessA = v; break;
         }
         // Ping the serial thread.
         updateLocked([&]{ });
     });
     tooltipConfig.onColor.addForever([&](uint32_t c) {
-        setVideoPattern(fake.color = c);
+        setVideoPattern(config.color = c);
     });
 
     mainWindow.onNotificationIcon.addForever([&](POINT p, bool primary) {
@@ -612,7 +637,7 @@ int ui::main() {
         tooltipWindow->show();
     });
 
-    if (false /* TODO if config not loaded */)
+    if (!initialized)
         tooltipConfig.onSettings();
     else
         setBothPatterns();
