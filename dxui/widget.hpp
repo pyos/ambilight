@@ -14,6 +14,7 @@ namespace ui {
         virtual void onChildRedraw(widget&, RECT) = 0;
         virtual void onChildResize(widget&) = 0;
         virtual window* parentWindow() = 0;
+        const window* parentWindow() const { return const_cast<widget_parent*>(this)->parentWindow(); }
     };
 
     struct widget : widget_parent {
@@ -79,6 +80,8 @@ namespace ui {
         void onChildResize(widget&) override {
             invalidateSize();
         }
+
+        using widget_parent::parentWindow;
 
         window* parentWindow() override {
             return parent ? parent->parentWindow() : nullptr;
