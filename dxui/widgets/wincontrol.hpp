@@ -9,12 +9,10 @@ namespace ui {
         name() : button(icon) { onClick.addForever([&]{                                 \
             if (auto __w = parentWindow()) clickAction(*__w); }); }                     \
     protected:                                                                          \
-        winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const override;     \
         RECT getOuter() const override;                                                 \
         RECT getInner() const override;                                                 \
     private:                                                                            \
         struct icon : texrect {                                                         \
-            winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const override; \
             RECT getOuter() const override;                                             \
         } icon;                                                                         \
     }

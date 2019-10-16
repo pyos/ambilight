@@ -44,7 +44,6 @@ namespace ui {
     protected:
         enum state { idle, hover, active };
         state getState() const { return currentState; }
-        winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const override;
         RECT getOuter() const override;
         RECT getInner() const override;
 

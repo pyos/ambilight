@@ -80,7 +80,7 @@ namespace ui {
             return {p.x, p.y, p.x, p.y};
         }
 
-        virtual winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const = 0;
+        virtual winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext&) const;
         virtual RECT getOuter() const = 0;
         virtual RECT getInner() const { return middleOf(getOuter()); }
 

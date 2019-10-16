@@ -1,4 +1,9 @@
+#include "data.hpp"
 #include "texrect.hpp"
+
+winapi::com_ptr<ID3D11Texture2D> ui::texrect::getTexture(ui::dxcontext& ctx) const {
+    return ctx.cachedTexture<builtinTexture>();
+}
 
 void ui::texrect::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
     auto [al, at, ar, ab] = getOuter();

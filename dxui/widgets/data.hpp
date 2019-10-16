@@ -42,13 +42,6 @@ namespace ui {
         });
     }
 
-    static winapi::com_ptr<ID3D11Texture2D> builtinTexture(ui::dxcontext& ctx) {
-        auto resource = ui::read(ui::fromBundled(IDI_WIDGETS), L"PNG");
-        if (!resource)
-            throw std::runtime_error("IDI_WIDGETS PNG-type resource could not be loaded");
-        return ctx.textureFromPNG(resource, /*mipmaps=*/true);
-    }
-
     enum builtin_rect {
         BUTTON_OUTER,
         BUTTON_OUTER_HOVER,
@@ -83,5 +76,6 @@ namespace ui {
         BUILTIN_RECT_COUNT
     };
 
+    winapi::com_ptr<ID3D11Texture2D> builtinTexture(ui::dxcontext&);
     RECT builtinRect(builtin_rect);
 }

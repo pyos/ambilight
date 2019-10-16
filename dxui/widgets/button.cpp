@@ -1,10 +1,6 @@
 #include "button.hpp"
 #include "data.hpp"
 
-winapi::com_ptr<ID3D11Texture2D> ui::button::getTexture(ui::dxcontext& ctx) const {
-    return ctx.cachedTexture<builtinTexture>();
-}
-
 RECT ui::button::getOuter() const {
     switch (getState()) {
         default:     return builtinRect(borderless ? BUTTON_BORDERLESS_OUTER : BUTTON_OUTER);
