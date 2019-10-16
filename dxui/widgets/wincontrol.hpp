@@ -6,8 +6,8 @@
 namespace ui {
 #define DXUI_GENERATE_BUTTON(name, rect, iconRect, clickAction) \
     struct name : button {                                                              \
-        name() : button(icon) { onClick.addForever([&]{                                 \
-            if (auto __w = parentWindow()) clickAction(*__w); }); }                     \
+        name() { setContents(&icon); onClick.addForever([&]{                            \
+            if (auto __w = parentWindow()) clickAction(*__w), invalidate(); }); }       \
     protected:                                                                          \
         RECT getOuter() const override {                                                \
             switch (getState()) {                                                       \
