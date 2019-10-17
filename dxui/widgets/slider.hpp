@@ -82,6 +82,7 @@ namespace ui {
             return ctx.cachedTexture<builtinTexture>(); }
         virtual RECT getTrack() const { return builtinRect(SLIDER_TRACK); }
         virtual RECT getGroove() const { return builtinRect(SLIDER_GROOVE); }
+        virtual RECT getFilled() const { return builtinRect(SLIDER_FILLED); }
 
     private:
         bool vertical() const { return currentOrientation == deg90  || currentOrientation == deg270; }

@@ -174,13 +174,12 @@ namespace appui {
                 return onChange(1, v); });
             e.onChange.addForever([this](size_t v) { return onChange(2, v); });
             s.onChange.addForever([this](size_t v) { return onChange(3, v); });
-            done.onClick.addForever([this]{ return onDone(); });
+            done.onClick.addForever([this]{ if (auto w = parentWindow()) w->close(); });
         }
 
     public:
         // 0 = width, 1 = height, 2 = music leds, 3 = serial port
         util::event<int /* parameter */, size_t /* new value */> onChange;
-        util::event<> onDone;
 
     private:
         screensetup image;
@@ -206,6 +205,7 @@ namespace appui {
             return ctx.cachedTexture<extraWidgets>(); }
         RECT getTrack() const override { return {0, 154, 15, 186}; }
         RECT getGroove() const override { return {15, 154 + 3 * i, 128, 157 + 3 * i}; }
+        RECT getFilled() const override { return {15, 163, 128, 166}; }
     };
 
     struct gray_bg : ui::texrect {
@@ -562,7 +562,6 @@ int ui::main() {
         }
     };
 
-    sizingConfig.onDone.addForever([&] { sizingWindow->close(); });
     sizingConfig.onChange.addForever([&](int i, size_t value) {
         switch (i) {
             case 0: config.width = value; break;

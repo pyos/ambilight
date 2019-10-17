@@ -15,6 +15,7 @@
 # sliders
  22,   0,   15,  32,  slider track
  22,  32,   15,   3,  slider groove
+ 22,  35,   15,   3,  slider filled
 # titlebar
  38,   0,   44,  24,  window close button outer
  38,  24,   44,  24,  window close button outer hover
@@ -28,7 +29,7 @@
  60,  12,    0,   0,  window frame button inner
 104,  36,    0,   0,  window frame button inner hover
 104,  60,    0,   0,  window frame button inner active
- 22,  35,   16,  16,  window icon close
+ 22,  38,   16,  16,  window icon close
  82,   0,   16,  16,  window icon maximize
  98,   0,   16,  16,  window icon unmaximize
- 22,  51,   16,  16,  window icon minimize
+ 22,  54,   16,  16,  window icon minimize

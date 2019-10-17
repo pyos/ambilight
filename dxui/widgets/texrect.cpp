@@ -37,6 +37,7 @@ RECT ui::builtinRect(builtin_rect r) {
         rects[BUTTON_BORDERLESS_INNER_ACTIVE] = map.at("button borderless inner active");
         rects[SLIDER_TRACK]                   = map.at("slider track");
         rects[SLIDER_GROOVE]                  = map.at("slider groove");
+        rects[SLIDER_FILLED]                  = map.at("slider filled");
         rects[WIN_CLOSE_OUTER]                = map.at("window close button outer");
         rects[WIN_CLOSE_OUTER_HOVER]          = map.at("window close button outer hover");
         rects[WIN_CLOSE_OUTER_ACTIVE]         = map.at("window close button outer active");

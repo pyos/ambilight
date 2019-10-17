@@ -18,6 +18,7 @@ namespace ui {
         BUTTON_BORDERLESS_INNER_ACTIVE,
         SLIDER_TRACK,
         SLIDER_GROOVE,
+        SLIDER_FILLED,
         WIN_CLOSE_OUTER,
         WIN_CLOSE_OUTER_HOVER,
         WIN_CLOSE_OUTER_ACTIVE,
