@@ -28,12 +28,12 @@ namespace appui {
         std::atomic<size_t> height;
         std::atomic<size_t> musicLeds;
         std::atomic<size_t> serial;
-        double brightnessV;
-        double brightnessA;
-        double gamma;
-        double dr;
-        double dg;
-        double db;
+        std::atomic<double> brightnessV;
+        std::atomic<double> brightnessA;
+        std::atomic<double> gamma;
+        std::atomic<double> dr;
+        std::atomic<double> dg;
+        std::atomic<double> db;
         uint32_t color;
     };
 
@@ -152,9 +152,9 @@ namespace appui {
     // |  Extra [-] ---|---------- [+] 3 |
     // | Serial [-] 3 [+]        [apply] |
     // +---------------------------------+
-    struct sizing_config : padded<ui::grid> {
+    struct sizing_config : ui::grid {
         sizing_config(const state& init)
-            : padded<ui::grid>({20, 20}, 1, 4)
+            : ui::grid(1, 4)
         {
             set({&image, &sliderGrid.pad, &helpLabel.pad, &bottomRow.pad});
             setPrimaryCell(0, 0);
@@ -184,11 +184,11 @@ namespace appui {
 
     private:
         screensetup image;
-        padded_label helpLabel{{20, 20}, {L"Tweak the values until you get the pattern shown above.",
-                                          ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 22}};
+        padded_label helpLabel{{40, 0}, {L"Tweak the values until you get the pattern shown above.",
+                                         ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 22}};
         padded_label doneLabel{{20, 0}, {L"Done", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}};
-        padded<ui::grid> sliderGrid{{20, 0}, 5, 4};
-        padded<ui::grid> bottomRow{{20, 20}, 6, 1};
+        padded<ui::grid> sliderGrid{{40, 40}, 5, 4};
+        padded<ui::grid> bottomRow{{40, 40}, 6, 1};
         ui::button done{doneLabel.pad};
         static constexpr size_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
         controlled_number w{sliderGrid, 0, L"Screen width",  1, LIMIT * 4 / 5, 1, true};
@@ -579,7 +579,7 @@ int ui::main() {
         auto w = GetSystemMetrics(SM_CXSCREEN);
         auto h = GetSystemMetrics(SM_CYSCREEN);
         sizingWindow = std::make_unique<ui::window>(800, 800, (w - 800) / 2, (h - 800) / 2);
-        sizingWindow->setRoot(&sizingConfig.pad);
+        sizingWindow->setRoot(&sizingConfig);
         sizingWindow->setBackground(0xcc111111u);
         sizingWindow->setTitle(L"Ambilight Setup");
         sizingWindow->onClose.addForever([&]{ setBothPatterns(); });
