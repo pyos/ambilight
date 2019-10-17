@@ -13,7 +13,10 @@ static DOUBLEX4 u2qd(uint32_t q) {
 }
 
 static uint32_t qd2u(DOUBLEX4 q) {
-    return (uint8_t)(q._1 * 255) << 24 | (uint8_t)(q._2 * 255) << 16 | (uint8_t)(q._3 * 255) << 8 | (uint8_t)(q._4 * 255);
+    return (uint8_t)round(q._1 * 255) << 24
+         | (uint8_t)round(q._2 * 255) << 16
+         | (uint8_t)round(q._3 * 255) << 8
+         | (uint8_t)round(q._4 * 255);
 }
 
 static DOUBLEX4 argb2ahsv(DOUBLEX4 x) {
@@ -26,7 +29,7 @@ static DOUBLEX4 argb2ahsv(DOUBLEX4 x) {
         h = r == max ? 0.0 + (g - b) / (max - min)
           : g == max ? 2.0 + (b - r) / (max - min)
           : /* c.B */  4.0 + (r - g) / (max - min);
-        h = h < 0 ? h / 6 + 1 : h / 6;
+        h = h / 6 + (h < 0);
     }
     return {a, h, s, v};
 }
