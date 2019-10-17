@@ -227,14 +227,42 @@ namespace appui {
 
     enum setting { Y, R, G, B, Lv, La };
 
-    struct color_config_tab : gray_bg {
-        color_config_tab(const state& init, util::event<setting, double>& onChange) {
-            setContents(&grid.pad);
-            grid.set({&yLabel.pad, &ySlider.pad,
-                      &rLabel.pad, &rSlider.pad,
-                      &gLabel.pad, &gSlider.pad,
-                      &bLabel.pad, &bSlider.pad});
-            grid.setColStretch(1, 1);
+    struct tooltip_config : ui::grid {
+        tooltip_config(const state& init)
+            : ui::grid(1, 4)
+        {
+            set(0, 1, init.color >> 24 ? &colorTab : nullptr);
+            set(0, 2, &brightnessGrid.pad);
+            set(0, 3, &buttons);
+            setColStretch(0, 1);
+
+            buttons.set({&gammaBg, &colorBg, nullptr, &sButton, &qButton});
+            buttons.setColStretch(2, 1);
+            if (!(init.color >> 24))
+                colorBg.toggle();
+            gammaBg.toggle();
+            gammaButton.onClick.addForever([this] { set(0, 0, gammaBg.toggle() ? &gammaTab : nullptr); });
+            colorButton.onClick.addForever([this] {
+                bool show = colorBg.toggle();
+                set(0, 1, show ? &colorTab : nullptr);
+                return onColor(color() & (show ? 0xFFFFFFFFu : 0x00FFFFFFu));
+            });
+            sButton.onClick.addForever([this]{ return onSettings(); });
+            qButton.onClick.addForever([this]{ return onQuit(); });
+
+            brightnessGrid.set({&bvLabel.pad, &bvSlider.pad,
+                                &baLabel.pad, &baSlider.pad});
+            brightnessGrid.setColStretch(1, 1);
+            bvSlider.setValue(init.brightnessV);
+            baSlider.setValue(init.brightnessA);
+            bvSlider.onChange.addForever([this](double v) { return onChange(Lv, v); });
+            baSlider.onChange.addForever([this](double v) { return onChange(La, v); });
+
+            gammaGrid.set({&yLabel.pad, &ySlider.pad,
+                           &rLabel.pad, &rSlider.pad,
+                           &gLabel.pad, &gSlider.pad,
+                           &bLabel.pad, &bSlider.pad});
+            gammaGrid.setColStretch(1, 1);
             ySlider.setValue((init.gamma - 1) / 2); // use gamma from 1 to 3
             rSlider.setValue(init.dr);
             gSlider.setValue(init.dg);
@@ -243,77 +271,14 @@ namespace appui {
             rSlider.onChange.addForever([&](double value) { return onChange(R, value); });
             gSlider.onChange.addForever([&](double value) { return onChange(G, value); });
             bSlider.onChange.addForever([&](double value) { return onChange(B, value); });
-        }
 
-    private:
-        padded<ui::grid> grid{{10, 10}, 2, 4};
-        padded_label yLabel{{10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
-        padded_label rLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFFFF3333u}};
-        padded_label gLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF33FF33u}};
-        padded_label bLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF3333FFu}};
-        padded<ui::slider> ySlider{{10, 10}};
-        padded<ui::slider> rSlider{{10, 10}};
-        padded<ui::slider> gSlider{{10, 10}};
-        padded<ui::slider> bSlider{{10, 10}};
-    };
-
-    struct color_select_tab : gray_bg {
-        color_select_tab(const state& init, util::event<uint32_t>& onChange) {
-            setContents(&grid.pad);
-            grid.set({&hueSlider.pad, &satSlider.pad});
-            grid.setColStretch(0, 1);
+            colorGrid.set({&hueSlider.pad, &satSlider.pad});
+            colorGrid.setColStretch(0, 1);
             auto [a, h, s, v] = argb2ahsv(u2qd(init.color));
             hueSlider.setValue(h);
             satSlider.setValue(s);
-            hueSlider.onChange.addForever([&](double) { return onChange(value()); });
-            satSlider.onChange.addForever([&](double) { return onChange(value()); });
-        }
-
-        uint32_t value() const {
-            return qd2u(ahsv2argb({1, hueSlider.value(), satSlider.value(), 1}));
-        }
-
-    private:
-        padded<ui::grid> grid{{10, 10}, 1, 2};
-        padded<texslider<0>> hueSlider{{10, 10}};
-        padded<texslider<1>> satSlider{{10, 10}};
-    };
-
-    struct tooltip_config : ui::grid {
-        tooltip_config(const state& init)
-            : ui::grid(1, 5)
-            , gammaTab(init, onChange)
-            , colorTab(init, onColor)
-        {
-            if (init.color >> 24)
-                set(0, 0, &colorTab);
-            else
-                colorBg.toggle();
-            gammaBg.toggle();
-            set(0, 3, &brightnessGrid.pad);
-            set(0, 4, &buttons);
-            setColStretch(0, 1);
-
-            buttons.set({&gammaBg, &colorBg, nullptr, &sButton, &qButton});
-            buttons.setColStretch(2, 1);
-
-            brightnessGrid.set({&bLabel.pad, &bSlider.pad,
-                                &mLabel.pad, &mSlider.pad});
-            brightnessGrid.setColStretch(1, 1);
-            bSlider.setValue(init.brightnessV);
-            mSlider.setValue(init.brightnessA);
-
-            gammaButton.onClick.addForever([this] { set(0, 0, gammaBg.toggle() ? &gammaTab : nullptr); });
-            colorButton.onClick.addForever([this] {
-                bool show = colorBg.toggle();
-                set(0, 1, show ? &colorTab : nullptr);
-                return onColor(colorTab.value() & (show ? 0xFFFFFFFFu : 0x00FFFFFFu));
-            });
-
-            bSlider.onChange.addForever([this](double v) { return onChange(Lv, v); });
-            mSlider.onChange.addForever([this](double v) { return onChange(La, v); });
-            sButton.onClick.addForever([this]{ return onSettings(); });
-            qButton.onClick.addForever([this]{ return onQuit(); });
+            hueSlider.onChange.addForever([&](double) { return onColor(color()); });
+            satSlider.onChange.addForever([&](double) { return onColor(color()); });
         }
 
     public:
@@ -323,9 +288,12 @@ namespace appui {
         util::event<> onQuit;
 
     private:
+        uint32_t color() const {
+            return qd2u(ahsv2argb({1, hueSlider.value(), satSlider.value(), 1}));
+        }
+
+    private:
         ui::grid buttons{5, 1};
-        color_config_tab gammaTab;
-        color_select_tab colorTab;
         padded_label gammaLabel{{5, 5}, {L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         padded_label colorLabel{{5, 5}, {L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         padded_label sLabel{{5, 5}, {L"\uf013", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
@@ -338,10 +306,26 @@ namespace appui {
         gray_bg colorBg{colorButton};
 
         padded<ui::grid> brightnessGrid{{10, 10}, 2, 2};
-        padded_label bLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
-        padded_label mLabel{{10, 10}, {L"\uf001", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
-        padded<texslider<2>> bSlider{{10, 10}};
-        padded<texslider<2>> mSlider{{10, 10}};
+        padded_label bvLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded_label baLabel{{10, 10}, {L"\uf001", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded<texslider<2>> bvSlider{{10, 10}};
+        padded<texslider<2>> baSlider{{10, 10}};
+
+        padded<ui::grid> gammaGrid{{10, 10}, 2, 4};
+        padded_label yLabel{{10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded_label rLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFFFF3333u}};
+        padded_label gLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF33FF33u}};
+        padded_label bLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF3333FFu}};
+        padded<ui::slider> ySlider{{10, 10}};
+        padded<ui::slider> rSlider{{10, 10}};
+        padded<ui::slider> gSlider{{10, 10}};
+        padded<ui::slider> bSlider{{10, 10}};
+        gray_bg gammaTab{gammaGrid.pad};
+
+        padded<ui::grid> colorGrid{{10, 10}, 1, 2};
+        padded<texslider<0>> hueSlider{{10, 10}};
+        padded<texslider<1>> satSlider{{10, 10}};
+        gray_bg colorTab{colorGrid.pad};
     };
 }
 
