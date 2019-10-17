@@ -480,7 +480,8 @@ int ui::main() {
             if (frameEv.wait_for(lock, std::chrono::seconds(2), [&]{ return frameDirty; })) {
                 // TODO apply color offsets
                 for (uint8_t strip = 0; strip < 4; strip++)
-                    comm.update(strip, frameData[strip], config.gamma, strip < 2 ? config.brightnessV : config.brightnessA);
+                    comm.update(strip, frameData[strip], config.gamma, strip < 2 ? config.brightnessV : config.brightnessA,
+                                config.dr, config.dg, config.db);
                 frameDirty = false;
             }
             lock.unlock();
