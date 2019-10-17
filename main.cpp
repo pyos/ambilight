@@ -113,7 +113,7 @@ namespace appui {
             set(1, 1, &screen);
             set(1, 2, &strip);
             setColStretch(0, 1); setColStretch(1, 6); setColStretch(2, 1);
-            setRowStretch(0, 1); setRowStretch(1, 6); setRowStretch(2, 1);
+            setRowStretch(0, 1); setRowStretch(1, 6); setRowStretch(2, 0);
             strip.set(1, 0, &stripL, ui::grid::align_end);
             strip.set(2, 0, &stripR, ui::grid::align_start);
             strip.setColStretch(0, 1);
@@ -578,7 +578,8 @@ int ui::main() {
         mainWindow.clearNotificationIcon();
         auto w = GetSystemMetrics(SM_CXSCREEN);
         auto h = GetSystemMetrics(SM_CYSCREEN);
-        sizingWindow = std::make_unique<ui::window>(800, 800, (w - 800) / 2, (h - 800) / 2);
+        auto s = std::min(w, h) * 3 / 4;
+        sizingWindow = std::make_unique<ui::window>(s, s, (w - s) / 2, (h - s) / 2);
         sizingWindow->setRoot(&sizingConfig);
         sizingWindow->setBackground(0xcc111111u);
         sizingWindow->setTitle(L"Ambilight Setup");
