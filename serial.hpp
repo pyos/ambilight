@@ -1,9 +1,6 @@
 #pragma once
 
-#define AMBILIGHT_PC
 #include "arduino/arduino.h"
-#undef AMBILIGHT_PC
-
 #include "dxui/span.hpp"
 #include "dxui/winapi.hpp"
 
@@ -34,9 +31,10 @@ struct serial {
         winapi::throwOnFalse(PurgeComm(handle.get(), PURGE_RXCLEAR | PURGE_TXCLEAR));
     }
 
-    void update(uint8_t strip, util::span<const UINT> data, double gamma, double brightness, double dr, double dg, double db) {
+    template <typename F /* LED(uint32_t) */>
+    void update(uint8_t strip, util::span<const UINT> data, F&& transform) {
         for (size_t i = 0; i < data.size(); i++) {
-            auto n = LED(data[i]).applyGamma(gamma, brightness, dr, dg, db);
+            LED n = transform(data[i]);
             size_t chunk = i / AMBILIGHT_SERIAL_CHUNK;
             size_t place = i % AMBILIGHT_SERIAL_CHUNK;
             valid[strip][chunk] &= n == color[strip][chunk][place];

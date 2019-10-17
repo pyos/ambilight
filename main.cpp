@@ -8,10 +8,7 @@
 #include "dxui/widgets/spacer.hpp"
 #include "dxui/widgets/wincontrol.hpp"
 
-#define AMBILIGHT_PC
 #include "arduino/arduino.h"
-#undef AMBILIGHT_PC
-
 #include "capture.h"
 #include "color.hpp"
 #include "defer.hpp"
@@ -478,11 +475,23 @@ int ui::main() {
             std::unique_lock<std::mutex> lock{mut};
             // Ping the arduino at least once per ~2s so that it knows the app is still running.
             if (frameEv.wait_for(lock, std::chrono::seconds(2), [&]{ return frameDirty; })) {
-                // TODO apply color offsets
-                for (uint8_t strip = 0; strip < 4; strip++)
-                    comm.update(strip, frameData[strip], config.gamma, strip < 2 ? config.brightnessV : config.brightnessA,
-                                config.dr, config.dg, config.db);
                 frameDirty = false;
+                for (uint8_t strip = 0; strip < 4; strip++) {
+                    comm.update(strip, frameData[strip], [
+                        brightness = strip < 2 ? config.brightnessV.load() : config.brightnessA.load(),
+                        gamma = config.gamma.load(), dr = config.dr.load(), dg = config.dg.load(), db = config.db.load()
+                    ](uint32_t color) {
+                        auto [a, r, g, b] = u2qd(color);
+                        // Naively applying round((x * brightness / 255) ^ gamma * 255) for each component
+                        // can multiply relative differences due to rounding errors, e.g. 16, 17, 16 (barely
+                        // greenish dark gray) at gamma 2.0 and brightness = 70% will become 0, 1, 0 (obvious
+                        // dark green). To avoid this, round the differences instead.
+                        g = pow(g * brightness / 255, gamma + dg - 1) * dg;
+                        r = pow(r * brightness / 255, gamma + dr - 1) * dr - g;
+                        b = pow(b * brightness / 255, gamma + db - 1) * db - g;
+                        return LED(round(r * 255) + round(g * 255), round(g * 255), round(b * 255) + round(g * 255));
+                    });
+                }
             }
             lock.unlock();
             comm.submit();
