@@ -13,7 +13,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     auto cursor = ui::loadCursor(ui::fromFile(IDC_ARROW));
     wc.cbSize        = sizeof(WNDCLASSEX);
     wc.lpszClassName = L"__mainClass";
-    wc.lpfnWndProc   = ui::impl::windowProc;
+    wc.lpfnWndProc   = ui::window::windowProc;
     wc.hInstance     = ui::impl::hInstance;
     wc.hIcon         = iconLg.get();
     wc.hIconSm       = iconSm.get();

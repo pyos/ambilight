@@ -89,31 +89,19 @@ namespace ui {
         // Remove the notification icon.
         void clearNotificationIcon() { notifyIcon.reset(); }
 
-        widget* getRoot() const { return root.get(); }
-
         // Set the root of the widget tree, return the old root.
         void setRoot(widget* newRoot) {
             root = widget_handle{newRoot, *this};
             draw();
         }
 
-        // Schedule redrawing of the entire window.
-        void draw() { draw({0, 0, size.x, size.y}); }
-
-        // Schedule redrawing of a region.
-        void draw(RECT);
-
-        // Redraw the specified area right now.
-        void drawImmediate(RECT);
-
-        void onMouse(POINT abs, int keys);
-        void onMouseLeave();
-
         void captureMouse(widget& target) {
             // assert(!mouseCapture);
             mouseCapture = &target;
             SetCapture(*this);
         }
+
+        static LRESULT windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam);
 
     public:
         // Fired when the window becomes visible because of a call to `show()` or because
@@ -148,6 +136,11 @@ namespace ui {
         util::event<> onSystemColorsChange;
 
     private:
+        void draw() { draw({0, 0, size.x, size.y}); }
+        void draw(RECT dirty) { InvalidateRect(*this, &dirty, FALSE); }
+        void drawImmediate(RECT);
+        void onMouse(POINT abs, int keys);
+        void onMouseLeave();
         void onChildRelease(widget& w) override { setRoot(nullptr); }
         void onChildRedraw(widget&, RECT area) override { draw(area); }
         void onChildResize(widget&) override { draw(); }
@@ -179,8 +172,4 @@ namespace ui {
         bool mouseInBounds = false;
         bool dragByEmptyAreas = true;
     };
-
-    namespace impl {
-        LRESULT windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam);
-    }
 }

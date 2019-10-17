@@ -85,7 +85,7 @@ static void applyGravity(ui::window::gravity g, LONG& a, LONG& b, LONG& d) {
     }
 }
 
-LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
+LRESULT ui::window::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
     auto window = reinterpret_cast<ui::window*>(GetWindowLongPtr(handle, GWLP_USERDATA));
     if (window) switch (msg) {
         case WM_SHOWWINDOW:
@@ -109,13 +109,13 @@ LRESULT ui::impl::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam
             window->onDestroy();
             break;
         case WM_GETMINMAXINFO:
-            if (auto root = window->getRoot())
-                reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = root->measureMin();
+            if (window->root)
+                reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = window->root->measureMin();
             break;
         case WM_SIZING:
-            if (auto root = window->getRoot()) {
+            if (window->root) {
                 auto r = reinterpret_cast<RECT*>(lParam);
-                auto [w, h] = root->measure({r->right - r->left, r->bottom - r->top});
+                auto [w, h] = window->root->measure({r->right - r->left, r->bottom - r->top});
                 auto left = wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_TOPLEFT || wParam == WMSZ_LEFT;
                 auto top  = wParam == WMSZ_TOPRIGHT   || wParam == WMSZ_TOPLEFT || wParam == WMSZ_TOP;
                 applyGravity(left ? ui::window::gravity_end : ui::window::gravity_start, r->left, r->right, w);
@@ -199,10 +199,6 @@ ui::window::window(int w, int h, int x, int y, window* parent) {
 void ui::window::setShadow(bool value) {
     MARGINS m = {value, value, value, value};
     DwmExtendFrameIntoClientArea(*this, &m);
-}
-
-void ui::window::draw(RECT dirty) {
-    InvalidateRect(*this, &dirty, FALSE);
 }
 
 void ui::window::drawImmediate(RECT scheduled) {
