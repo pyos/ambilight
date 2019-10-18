@@ -10,7 +10,6 @@
 #include <atomic>
 #include <vector>
 
-
 // See `captureVideo.cpp`.
 static HRESULT AudioDeviceExpectedErrors[] = {
     AUDCLNT_E_DEVICE_INVALIDATED,
@@ -30,65 +29,6 @@ static HRESULT AudioDeviceExpectedErrors[] = {
 // EWMA coefficients for merging consecutive updates. Greater = smoother.
 #define DFT_EWMA_RISE 0.50f
 #define DFT_EWMA_DROP 0.96f
-
-// When the default device for the specified flow and role is changed, set an atomic and fire an event.
-// This is a COM object, meaning it should be referenced through `util::intrusive_ptr`.
-struct AudioDeviceChangeListener : IMMNotificationClient {
-    AudioDeviceChangeListener(winapi::com_ptr<IMMDeviceEnumerator> enumerator, EDataFlow flow, ERole role, HANDLE event)
-        : enumerator(enumerator)
-        , expectedFlow(flow)
-        , expectedRole(role)
-        , event(event)
-    {
-        winapi::throwOnFalse(enumerator->RegisterEndpointNotificationCallback(this));
-    }
-
-    ~AudioDeviceChangeListener() {
-        enumerator->UnregisterEndpointNotificationCallback(this);
-    }
-
-    AudioDeviceChangeListener(const AudioDeviceChangeListener&) = delete;
-    AudioDeviceChangeListener& operator=(const AudioDeviceChangeListener&) = delete;
-
-    bool changed() const {
-        return triggered;
-    }
-
-    HRESULT OnDeviceStateChanged(LPCWSTR device, DWORD state) override { return S_OK; }
-    HRESULT OnDeviceAdded(LPCWSTR device) override { return S_OK; }
-    HRESULT OnDeviceRemoved(LPCWSTR device) override { return S_OK; }
-    HRESULT OnPropertyValueChanged(LPCWSTR device, const PROPERTYKEY) override { return S_OK; }
-    HRESULT OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR device) override {
-        if (flow == expectedFlow && role == expectedRole)
-            if (!triggered.exchange(true) && event)
-                SetEvent(event);
-        return S_OK;
-    }
-
-    HRESULT QueryInterface(const IID& iid, void** out) override {
-        return iid != __uuidof(IUnknown) && iid != __uuidof(IMMNotificationClient) ? E_NOINTERFACE
-                : !out ? E_POINTER
-                : (*out = this, S_OK);
-    }
-
-    ULONG AddRef() override {
-        return ++refcount;
-    }
-
-    ULONG Release() override {
-        auto n = --refcount;
-        if (!n) delete this;
-        return n;
-    }
-
-private:
-    winapi::com_ptr<IMMDeviceEnumerator> enumerator;
-    std::atomic<bool> triggered{false};
-    std::atomic<ULONG> refcount{1};
-    EDataFlow expectedFlow;
-    ERole expectedRole;
-    HANDLE event;
-};
 
 // Converts a binary audio sample into a floating-point number from 0 to 1
 // according to the device's wave format.
@@ -122,29 +62,12 @@ struct fft_release {
     }
 };
 
-struct close_handle {
-    void operator()(HANDLE h) const {
-        CloseHandle(h);
-    }
-};
-
-struct audio_client_stop {
-    void operator()(IAudioClient* client) {
-        client->Stop();
-    }
-};
-
-struct AudioOutputCapturer : IAudioCapturer {
-    AudioOutputCapturer()
-        : readyEvent(CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS))
-    {
-        winapi::throwOnFalse(readyEvent);
-
-        auto enumerator = COMv(IMMDeviceEnumerator, CoCreateInstance, __uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL);
+struct AudioOutputCapturer : IAudioCapturer, private IMMNotificationClient {
+    AudioOutputCapturer() {
+        enumerator = COMv(IMMDeviceEnumerator, CoCreateInstance, __uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL);
         // TODO AudioDeviceExpectedErrors
         auto device = COMe(IMMDevice, enumerator->GetDefaultAudioEndpoint, eRender, eConsole);
         audioClient = COM(IAudioClient, void, device->Activate, __uuidof(IAudioClient), CLSCTX_ALL, nullptr);
-        *&deviceChangeListener = new AudioDeviceChangeListener(enumerator, eRender, eConsole, readyEvent.get());
 
         WAVEFORMATEX* formatPtr = nullptr;
         // TODO AudioDeviceExpectedErrors
@@ -168,8 +91,13 @@ struct AudioOutputCapturer : IAudioCapturer {
             AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 0, 0, formatPtr, NULL));
         winapi::throwOnFalse(audioClient->SetEventHandle(readyEvent.get()));
         winapi::throwOnFalse(audioClient->Start());
-        audioClientStopper.reset(audioClient);
         captureClient = COMi(IAudioCaptureClient, audioClient->GetService);
+        winapi::throwOnFalse(enumerator->RegisterEndpointNotificationCallback(this));
+    }
+
+    ~AudioOutputCapturer() {
+        enumerator->UnregisterEndpointNotificationCallback(this);
+        audioClient->Stop();
     }
 
     util::span<const float> next(uint32_t timeout) override {
@@ -181,9 +109,8 @@ struct AudioOutputCapturer : IAudioCapturer {
             // Nothing is rendering to the stream, so insert an appropriate amount of silence.
             haveUpdates |= handleSound(nullptr, format.nSamplesPerSec * timeout / 1000);
         } else do {
-            if (deviceChangeListener->changed())
-                throw std::exception();
             // TODO AudioDeviceExpectedErrors
+            winapi::throwOnFalse(deviceChanged ? AUDCLNT_E_DEVICE_INVALIDATED : S_OK);
             winapi::throwOnFalse(captureClient->GetBuffer(&data, &frames, &flags, NULL, NULL));
             DEFER { captureClient->ReleaseBuffer(frames); };
             haveUpdates |= handleSound(flags & AUDCLNT_BUFFERFLAGS_SILENT ? nullptr : data, frames);
@@ -229,17 +156,32 @@ private:
         }
     }
 
+    HRESULT OnDeviceStateChanged(LPCWSTR device, DWORD state) override { return S_OK; }
+    HRESULT OnDeviceAdded(LPCWSTR device) override { return S_OK; }
+    HRESULT OnDeviceRemoved(LPCWSTR device) override { return S_OK; }
+    HRESULT OnPropertyValueChanged(LPCWSTR device, const PROPERTYKEY) override { return S_OK; }
+    HRESULT OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR device) override {
+        if (flow == eRender && role == eConsole)
+            if (!deviceChanged.exchange(true))
+                SetEvent(readyEvent.get());
+        return S_OK;
+    }
+
+    HRESULT QueryInterface(const IID& iid, void** out) override { return E_NOINTERFACE; }
+    ULONG AddRef() override { return 1; }
+    ULONG Release() override { return 1; }
+
 private:
-    std::unique_ptr<std::remove_pointer_t<HANDLE>, close_handle> readyEvent;
+    winapi::handle readyEvent{winapi::throwOnFalse(CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS))};
+    winapi::com_ptr<IMMDeviceEnumerator> enumerator;
     winapi::com_ptr<IAudioClient> audioClient;
     winapi::com_ptr<IAudioCaptureClient> captureClient;
-    winapi::com_ptr<AudioDeviceChangeListener> deviceChangeListener;
-    std::unique_ptr<IAudioClient, audio_client_stop> audioClientStopper;
     std::unique_ptr<kiss_fftr_state, fft_release> fft;
     std::vector<kiss_fft_scalar> samplesL;
     std::vector<kiss_fft_scalar> samplesR;
     std::vector<kiss_fft_cpx> fftBuffer;
     std::vector<float> mapped;
+    std::atomic<bool> deviceChanged{false};
     AudioSampleReader* reader = nullptr;
     WAVEFORMATEX format;
     UINT nextSample = 0;
