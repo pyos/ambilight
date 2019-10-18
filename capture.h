@@ -11,9 +11,6 @@ struct IAudioCapturer {
     // number of milliseconds. Return an array of amplitudes averaged by octave,
     // or an empty span if there aren't enough samples yet.
     //
-    // May throw `util::retry` if the captured device's configuration has changed.
-    // In that case, reconstruct the object after a short delay.
-    //
     // TODO define the range of amplitudes.
     virtual util::span<const float> next(uint32_t timeout = 200) = 0;
 };
@@ -23,9 +20,6 @@ struct IVideoCapturer {
     // Capture a new frame, blocking for up to the specified number of milliseconds.
     // Return the frame as a span of width * height ARGB pixels. If nothing has changed
     // since the last call, return an empty span instead.
-    //
-    // May throw `util::retry` if the captured device's configuration has changed.
-    // In that case, reconstruct the object after a short delay.
     virtual util::span<const uint32_t> next(uint32_t timeout = 500) = 0;
 };
 
