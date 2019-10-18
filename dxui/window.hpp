@@ -157,7 +157,7 @@ namespace ui {
         dxcontext context;
         widget_handle root;
         widget* mouseCapture = nullptr;
-        impl::holder<HWND, DestroyWindow> handle;
+        winapi::holder<HWND, DestroyWindow> handle;
         winapi::com_ptr<IDXGISwapChain1> swapChain;
         winapi::com_ptr<IDCompositionDevice> device;
         winapi::com_ptr<IDCompositionTarget> target;

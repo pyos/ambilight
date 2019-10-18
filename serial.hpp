@@ -65,7 +65,7 @@ private:
     }
 
 private:
-    ui::handle handle;
+    winapi::handle handle;
     LED  color[4][AMBILIGHT_CHUNKS_PER_STRIP][AMBILIGHT_SERIAL_CHUNK] = {};
     bool valid[4][AMBILIGHT_CHUNKS_PER_STRIP] = {};
 };

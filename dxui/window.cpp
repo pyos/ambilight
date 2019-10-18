@@ -191,7 +191,7 @@ LRESULT ui::window::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lPar
 
 ui::window::window(int w, int h, int x, int y, window* parent) {
     handle.reset(CreateWindowEx(0, L"__mainClass", L"", WS_OVERLAPPEDWINDOW, x, y,
-        w, h, parent ? parent->handle.get() : nullptr, nullptr, impl::hInstance, nullptr));
+        w, h, parent ? parent->handle.get() : nullptr, nullptr, hInstance, nullptr));
     winapi::throwOnFalse(handle);
     SetWindowLongPtr(*this, GWLP_USERDATA, (LONG_PTR)this);
     // Request a WM_NCCALCSIZE so that Windows knows we don't want a frame.

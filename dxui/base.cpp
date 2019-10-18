@@ -5,10 +5,10 @@
 #include <shellscalingapi.h>
 #pragma comment(lib, "shcore.lib")
 
-HINSTANCE ui::impl::hInstance = nullptr;
+HINSTANCE ui::hInstance = nullptr;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, INT nCmdShow) try {
-    ui::impl::hInstance = hInstance;
+    ui::hInstance = hInstance;
     ui::initCOM();
     WNDCLASSEX wc = {};
     auto iconLg = ui::loadNormalIcon(ui::fromBundled(IDI_APP));
@@ -17,7 +17,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wc.cbSize        = sizeof(WNDCLASSEX);
     wc.lpszClassName = L"__mainClass";
     wc.lpfnWndProc   = ui::window::windowProc;
-    wc.hInstance     = ui::impl::hInstance;
+    wc.hInstance     = ui::hInstance;
     wc.hIcon         = iconLg.get();
     wc.hIconSm       = iconSm.get();
     wc.hCursor       = cursor.get();
@@ -25,14 +25,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wc.style         = CS_HREDRAW | CS_VREDRAW;
     winapi::throwOnFalse(RegisterClassEx(&wc));
     return ui::main();
-} catch (const std::exception& e) {
-    // TODO
-    return 1;
+} catch (const std::exception&) {
+    return 1; // TODO
 }
 
 int ui::dispatch() {
     DWORD_PTR scalingCookie;
-    ui::handle scalingEvent{CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS)};
+    winapi::handle scalingEvent{CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS)};
     winapi::throwOnFalse(scalingEvent);
     winapi::throwOnFalse(RegisterScaleChangeEvent(scalingEvent.get(), &scalingCookie));
     // XXX maybe RegisterScaleChangeEvent(scalingCookie) on exit?

@@ -13,6 +13,19 @@
 #include <windows.h>
 
 namespace winapi {
+    namespace impl {
+        template <typename T, BOOL (*F)(T)>
+        struct deleter {
+            void operator()(T x) {
+                F(x);
+            }
+        };
+    }
+
+    template <typename T, BOOL (*F)(T)>
+    using holder = std::unique_ptr<std::remove_pointer_t<T>, impl::deleter<T, F>>;
+    using handle = holder<HANDLE, CloseHandle>;
+
     struct error : std::runtime_error {
         template <typename T>
         error(HRESULT hr, T message) : std::runtime_error(message), hr(hr) {}
