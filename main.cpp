@@ -387,7 +387,7 @@ int ui::main() {
         unsafePart();
         frameDirty = true;
         frameEv.notify_all();
-        // TODO render the preview
+        // TODO render a preview somewhere -- can't think of a good UI
     };
 
     auto loopThread = [&](auto&& f) {
@@ -396,9 +396,20 @@ int ui::main() {
                 f();
             } catch (const std::exception&) {
                 // Probably just device reconfiguration or whatever.
-                // TODO there are TODOs scattered around `captureVideo.cpp` and `captureAudio.cpp`;
-                //      these mark actual places where errors can occur due to reconfiguration.
-                //      The rest should be fatal.
+                // TODO only these errors are non-fatal for audio capturing:
+                //     AUDCLNT_E_DEVICE_INVALIDATED
+                //     AUDCLNT_E_DEVICE_IN_USE
+                //     AUDCLNT_E_SERVICE_NOT_RUNNING
+                //     AUDCLNT_E_BUFFER_OPERATION_PENDING
+                // TODO only these errors are non-fatal for video capturing:
+                //     DXGI_ERROR_DRIVER_INTERNAL_ERROR
+                //     DXGI_ERROR_DEVICE_REMOVED
+                //     DXGI_ERROR_DEVICE_RESET
+                //     DXGI_ERROR_ACCESS_LOST
+                //     DXGI_ERROR_UNSUPPORTED
+                //     DXGI_ERROR_SESSION_DISCONNECTED
+                //     E_ACCESSDENIED
+                //     E_OUTOFMEMORY
                 Sleep(500);
             }
         }};

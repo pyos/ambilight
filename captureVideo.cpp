@@ -1,44 +1,9 @@
-#include <numeric>
-#include <vector>
-
 #include "capture.h"
 #include "defer.hpp"
-
 #include "dxui/draw.hpp"
-//#include "commonDXGI.h"
 
-// Certain errors from certain calls are returned when the display configuration changes,
-// e.g. an application enters or leaves fullscreen mode. When these happen, `orFail` should
-// throw `retry` instead of `fatal`.
-static HRESULT SystemTransitionsExpectedErrors[] = { // for general Dxgi API
-    DXGI_ERROR_DRIVER_INTERNAL_ERROR,
-    DXGI_ERROR_DEVICE_REMOVED,
-    DXGI_ERROR_DEVICE_RESET,
-    DXGI_ERROR_ACCESS_LOST,
-    WAIT_ABANDONED,
-    E_OUTOFMEMORY,
-    S_OK
-};
-
-static HRESULT CreateDuplicationExpectedErrors[] = { // for IDXGIOutput1::DuplicateOutput
-    DXGI_ERROR_DRIVER_INTERNAL_ERROR,
-    DXGI_ERROR_DEVICE_REMOVED,
-    DXGI_ERROR_DEVICE_RESET,
-    DXGI_ERROR_UNSUPPORTED,
-    DXGI_ERROR_SESSION_DISCONNECTED,
-    E_ACCESSDENIED,
-    E_OUTOFMEMORY,
-    S_OK
-};
-
-static HRESULT FrameInfoExpectedErrors[] = { // for IDXGIOutputDuplication methods
-    DXGI_ERROR_DRIVER_INTERNAL_ERROR,
-    DXGI_ERROR_DEVICE_REMOVED,
-    DXGI_ERROR_DEVICE_RESET,
-    DXGI_ERROR_ACCESS_LOST,
-    E_OUTOFMEMORY,
-    S_OK
-};
+#include <numeric>
+#include <vector>
 
 struct ScreenCapturer : IVideoCapturer {
     ScreenCapturer(UINT output, UINT w, UINT h)
@@ -46,10 +11,8 @@ struct ScreenCapturer : IVideoCapturer {
     {
         auto dxgiDevice = COMi(IDXGIDevice, res.raw()->QueryInterface);
         auto dxgiAdapter = COMi(IDXGIAdapter, dxgiDevice->GetParent);
-        // TODO CreateDuplicationExpectedErrors in next line
         auto dxgiOutput = COMe(IDXGIOutput, dxgiAdapter->EnumOutputs, output);
         auto dxgiOutput1 = COMi(IDXGIOutput1, dxgiOutput->QueryInterface);
-        // TODO CreateDuplicationExpectedErrors in next line
         display = COMe(IDXGIOutputDuplication, dxgiOutput1->DuplicateOutput, res.raw());
         DXGI_OUTPUT_DESC displayDesc;
         dxgiOutput->GetDesc(&displayDesc);
@@ -73,21 +36,18 @@ struct ScreenCapturer : IVideoCapturer {
         targetDesc.SampleDesc.Count = 1;
         targetDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
         targetDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-        // TODO SystemTransitionsExpectedErrors
         complete = COMe(ID3D11Texture2D, res.raw()->CreateTexture2D, &targetDesc, nullptr);
 
         targetDesc.Width = w;
         targetDesc.Height = h;
         targetDesc.MipLevels = 1;
         targetDesc.MiscFlags = 0;
-        // TODO SystemTransitionsExpectedErrors
         rescaled1 = COMe(ID3D11Texture2D, res.raw()->CreateTexture2D, &targetDesc, nullptr);
         rescaled2 = COMe(ID3D11Texture2D, res.raw()->CreateTexture2D, &targetDesc, nullptr);
 
         targetDesc.Usage = D3D11_USAGE_STAGING;
         targetDesc.BindFlags = 0;
         targetDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-        // TODO SystemTransitionsExpectedErrors
         cpuReadTarget = COMe(ID3D11Texture2D, res.raw()->CreateTexture2D, &targetDesc, nullptr);
     }
 
@@ -95,7 +55,6 @@ struct ScreenCapturer : IVideoCapturer {
         bool needUpdate = !needRelease;
         if (needRelease) {
             needRelease = false;
-            // TODO FrameInfoExpectedErrors
             winapi::throwOnFalse(display->ReleaseFrame());
         }
 
@@ -104,7 +63,6 @@ struct ScreenCapturer : IVideoCapturer {
         auto hr = display->AcquireNextFrame(timeout, &frameInfo, &resource);
         if (hr == DXGI_ERROR_WAIT_TIMEOUT)
             return {};
-        // TODO FrameInfoExpectedErrors
         winapi::throwOnFalse(hr);
         needRelease = true;
         if (!frameInfo.TotalMetadataBufferSize)
@@ -153,7 +111,6 @@ struct ScreenCapturer : IVideoCapturer {
 
         auto readSurface = COMi(IDXGISurface, cpuReadTarget->QueryInterface);
         DXGI_MAPPED_RECT mapped;
-        // TODO SystemTransitionsExpectedErrors
         winapi::throwOnFalse(readSurface->Map(&mapped, DXGI_MAP_READ));
         DEFER { readSurface->Unmap(); };
         for (UINT y = 0; y < rescaledDesc.Height; y++)
@@ -166,7 +123,6 @@ private:
     util::span<std::conditional_t<dirty, RECT, DXGI_OUTDUPL_MOVE_RECT>> meta() {
         auto data = reinterpret_cast<std::conditional_t<dirty, RECT, DXGI_OUTDUPL_MOVE_RECT>*>(metadata.data());
         UINT size = (UINT)metadata.size();
-        // TODO FrameInfoExpectedErrors
         if constexpr (dirty)
             winapi::throwOnFalse(display->GetFrameDirtyRects(size, data, &size));
         else

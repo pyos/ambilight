@@ -10,15 +10,6 @@
 #include <atomic>
 #include <vector>
 
-// See `captureVideo.cpp`.
-static HRESULT AudioDeviceExpectedErrors[] = {
-    AUDCLNT_E_DEVICE_INVALIDATED,
-    AUDCLNT_E_DEVICE_IN_USE,
-    AUDCLNT_E_SERVICE_NOT_RUNNING,
-    AUDCLNT_E_BUFFER_OPERATION_PENDING,
-    S_OK
-};
-
 // The minimal frequency resolved by DFT.
 #define DFT_RESOLUTION 25
 
@@ -65,12 +56,10 @@ struct fft_release {
 struct AudioOutputCapturer : IAudioCapturer, private IMMNotificationClient {
     AudioOutputCapturer() {
         enumerator = COMv(IMMDeviceEnumerator, CoCreateInstance, __uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL);
-        // TODO AudioDeviceExpectedErrors
         auto device = COMe(IMMDevice, enumerator->GetDefaultAudioEndpoint, eRender, eConsole);
         audioClient = COM(IAudioClient, void, device->Activate, __uuidof(IAudioClient), CLSCTX_ALL, nullptr);
 
         WAVEFORMATEX* formatPtr = nullptr;
-        // TODO AudioDeviceExpectedErrors
         winapi::throwOnFalse(audioClient->GetMixFormat(&formatPtr));
         DEFER { CoTaskMemFree(formatPtr); };
         format = *formatPtr;
@@ -86,7 +75,6 @@ struct AudioOutputCapturer : IAudioCapturer, private IMMNotificationClient {
         // Discard 0 Hz, group the rest into octaves. First half is left channel, second half is right channel.
         mapped.resize(log2fp1(n / 2) * 2);
 
-        // TODO AudioDeviceExpectedErrors
         winapi::throwOnFalse(audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED,
             AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 0, 0, formatPtr, NULL));
         winapi::throwOnFalse(audioClient->SetEventHandle(readyEvent.get()));
@@ -109,7 +97,6 @@ struct AudioOutputCapturer : IAudioCapturer, private IMMNotificationClient {
             // Nothing is rendering to the stream, so insert an appropriate amount of silence.
             haveUpdates |= handleSound(nullptr, format.nSamplesPerSec * timeout / 1000);
         } else do {
-            // TODO AudioDeviceExpectedErrors
             winapi::throwOnFalse(deviceChanged ? AUDCLNT_E_DEVICE_INVALIDATED : S_OK);
             winapi::throwOnFalse(captureClient->GetBuffer(&data, &frames, &flags, NULL, NULL));
             DEFER { captureClient->ReleaseBuffer(frames); };
