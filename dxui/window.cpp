@@ -263,25 +263,17 @@ void ui::window::drawImmediate(RECT scheduled) {
     winapi::throwOnFalse(swapChain->Present(1, 0));
 }
 
-static uint32_t immersiveColor(LPCWSTR name) {
-    if (!GetImmersiveUserColorSetPreference || !GetImmersiveColorTypeFromName || !GetImmersiveColorFromColorSetEx)
+uint32_t ui::systemColor(ui::system_color c) {
+    auto name = c == system_color::accent     ? L"ImmersiveSystemAccent"
+              : c == system_color::background ? L"ImmersiveApplicationBackground"
+              : c == system_color::taskbar    ? L"ImmersiveSystemBackground"
+              : nullptr;
+    if (!GetImmersiveUserColorSetPreference || !GetImmersiveColorTypeFromName || !GetImmersiveColorFromColorSetEx || !name)
         return 0;
     auto colorSet = GetImmersiveUserColorSetPreference(FALSE, FALSE);
     auto colorType = GetImmersiveColorTypeFromName(name);
     auto abgr = GetImmersiveColorFromColorSetEx(colorSet, colorType, FALSE, 0);
     return abgr & 0xFF00FF00u | (abgr & 0xFF0000u) >> 16 | (abgr & 0xFFu) << 16;
-}
-
-uint32_t ui::systemAccentColor() {
-    return immersiveColor(L"ImmersiveSystemAccent");
-}
-
-uint32_t ui::systemBackgroundColor() {
-    return immersiveColor(L"ImmersiveApplicationBackground");
-}
-
-uint32_t ui::systemTaskBarColor() {
-    return immersiveColor(L"ImmersiveSystemBackground");
 }
 
 void ui::window::setBackground(uint32_t tint, bool acrylic) {

@@ -8,14 +8,10 @@
 #include <dcomp.h>
 
 namespace ui {
-    // Get the current Windows 8 theme accent color, or 0 if unable to determine.
-    uint32_t systemAccentColor();
+    enum class system_color { accent, background, taskbar };
 
-    // Get the current Windows 8 theme background color, or 0 if unable to determine.
-    uint32_t systemBackgroundColor();
-
-    // Get the current Windows 8 theme taskbar color, or 0 if unable to determine.
-    uint32_t systemTaskBarColor();
+    // Get a Windows 8 theme color, or 0 if unable to determine.
+    uint32_t systemColor(system_color);
 
     // A DirectX11 swap chain-backed window.
     //
