@@ -338,8 +338,7 @@ int ui::main() {
     configPath[--i] = 'c';
     try {
         DWORD result;
-        ui::impl::holder<HANDLE, CloseHandle> file{
-            CreateFile(configPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)};
+        ui::handle file{CreateFile(configPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)};
         winapi::throwOnFalse(file);
         winapi::throwOnFalse(ReadFile(file.get(), &config, sizeof(config), &result, nullptr) && result == sizeof(config));
         initialized = true;
@@ -351,8 +350,7 @@ int ui::main() {
     mainWindow.setTitle(L"Ambilight");
     mainWindow.onDestroy.addForever([&] {
         DWORD result;
-        if (ui::impl::holder<HANDLE, CloseHandle> file{
-                CreateFile(configPath, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0)})
+        if (ui::handle file{CreateFile(configPath, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0)})
             WriteFile(file.get(), &config, sizeof(config), &result, nullptr);
         ui::quit();
     });

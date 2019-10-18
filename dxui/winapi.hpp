@@ -57,20 +57,15 @@ namespace winapi {
         T** operator&() {
             return reinterpret_cast<T**>(this);
         }
-    };
 
-    namespace impl {
-        template <typename R, typename F /* = HRESULT(R**) */>
-        com_ptr<R> com_call(F&& f) {
-            com_ptr<R> ret;
-            winapi::throwOnFalse((HRESULT)f(&ret));
-            return ret;
-        }
-    }
+        template <typename F /* = HRESULT(T**) */,
+                  typename R = std::enable_if_t<std::is_same_v<std::invoke_result_t<F, T**>, HRESULT>>>
+        com_ptr(F&& f) { winapi::throwOnFalse(f(reinterpret_cast<T**>(this))); }
+    };
 }
 
 // Call an out-pointer returning COM method.
-#define COM(R, T, f, ...) winapi::impl::com_call<R>([&](R** __p) { return f(__VA_ARGS__##, reinterpret_cast<T**>(__p)); })
+#define COM(R, T, f, ...) winapi::com_ptr<R>([&](R** __p) { return f(__VA_ARGS__##, reinterpret_cast<T**>(__p)); })
 
 // Call an out-pointer returning COM method that takes an interface as a single argument,
 // such as `QueryInterface`, e.g. `COMi(ISomeInterface, someObject->QueryInterface)`

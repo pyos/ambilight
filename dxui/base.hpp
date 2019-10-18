@@ -19,6 +19,8 @@ namespace ui {
         using holder = std::unique_ptr<std::remove_pointer_t<T>, deleter<T, F>>;
     }
 
+    using handle = impl::holder<HANDLE, CloseHandle>;
+
     // Main entry point. Implement this in a unit somewhere.
     int main();
 
