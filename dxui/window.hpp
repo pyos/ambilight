@@ -168,6 +168,7 @@ namespace ui {
         POINT size = {1, 1};
         POINT dragBy = {-1, -1};
         RECT lastPainted = {0, 0, 0, 0};
+        uint32_t scaleFactor = 100;
         uint32_t background = 0xFFFFFFFFu;
         bool mouseInBounds = false;
         bool dragByEmptyAreas = true;

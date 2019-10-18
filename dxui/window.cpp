@@ -2,9 +2,11 @@
 
 #include <windowsx.h>
 #include <dwmapi.h>
+#include <shellscalingapi.h>
 #pragma comment(lib, "dcomp.lib")
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "uxtheme.lib")
+#pragma comment(lib, "shcore.lib")
 
 typedef enum {
     WCA_UNDEFINED,
@@ -85,6 +87,30 @@ static void applyGravity(ui::window::gravity g, LONG& a, LONG& b, LONG& d) {
     }
 }
 
+static uint32_t scaleFactorForWindow(HWND handle) {
+    DEVICE_SCALE_FACTOR sf = DEVICE_SCALE_FACTOR_INVALID;
+    GetScaleFactorForMonitor(MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST), &sf);
+    switch (sf) {
+    default:
+    case SCALE_100_PERCENT: return 100;
+    case SCALE_120_PERCENT: return 120;
+    case SCALE_125_PERCENT: return 125;
+    case SCALE_140_PERCENT: return 140;
+    case SCALE_150_PERCENT: return 150;
+    case SCALE_160_PERCENT: return 160;
+    case SCALE_175_PERCENT: return 175;
+    case SCALE_180_PERCENT: return 180;
+    case SCALE_200_PERCENT: return 200;
+    case SCALE_225_PERCENT: return 225;
+    case SCALE_250_PERCENT: return 250;
+    case SCALE_300_PERCENT: return 300;
+    case SCALE_350_PERCENT: return 350;
+    case SCALE_400_PERCENT: return 400;
+    case SCALE_450_PERCENT: return 450;
+    case SCALE_500_PERCENT: return 500;
+    }
+}
+
 LRESULT ui::window::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam) {
     auto window = reinterpret_cast<ui::window*>(GetWindowLongPtr(handle, GWLP_USERDATA));
     if (window) switch (msg) {
@@ -96,10 +122,8 @@ LRESULT ui::window::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lPar
             window->onResize();
             // fallthrough
         case WM_MOVE:
-            // TODO
-            //   DEVICE_SCALE_FACTOR sf;
-            //   GetScaleFactorForMonitor(MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST), &sf);
-            // Also RegisterScaleChangeEvent
+            if (auto sf = scaleFactorForWindow(handle); sf != window->scaleFactor)
+                window->scaleFactor = sf, window->draw();
             break;
         case WM_CLOSE:
             if (window->onClose())
