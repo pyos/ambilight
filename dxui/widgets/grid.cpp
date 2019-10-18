@@ -63,8 +63,8 @@ POINT ui::grid::measureImpl(POINT fit) const {
         auto& r = rows[primary.second - 1];
         if (auto& item = cells[(primary.first - 1) + (primary.second - 1) * cols.size()]) {
             auto [w, h] = item->measure({remaining.x + c.size, remaining.y + r.size});
-            c.size = w;
-            r.size = h;
+            c.size = std::max(c.size, w);
+            r.size = std::max(r.size, h);
         }
     }
     // Now that all sizes are finally set, we can compute the start offsets.
