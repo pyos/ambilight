@@ -201,8 +201,8 @@ namespace appui {
         winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
             return ctx.cachedTexture<extraWidgets>(); }
         RECT getTrack() const override { return {0, 154, 15, 186}; }
-        RECT getGroove() const override { return {15, 154 + 3 * i, 128, 157 + 3 * i}; }
-        RECT getFilled() const override { return {15, 163, 128, 166}; }
+        RECT getGroove() const override { return {15, 154 + 6 * i, 128, 157 + 6 * i}; }
+        RECT getFilled() const override { return {15, 157 + 6 * i, 128, 160 + 6 * i}; }
     };
 
     struct gray_bg : ui::texrect {
@@ -292,7 +292,7 @@ namespace appui {
     private:
         ui::grid buttons{5, 1};
         padded_label gammaLabel{{5, 5}, {L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        padded_label colorLabel{{5, 5}, {L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
+        padded_label colorLabel{{7, 5}, {L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         padded_label sLabel{{5, 5}, {L"\uf013", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         padded_label qLabel{{5, 5}, {L"\uf011", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         ui::borderless_button gammaButton{gammaLabel.pad};
