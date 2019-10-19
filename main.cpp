@@ -233,7 +233,7 @@ namespace appui {
             set(0, 3, &buttons);
             setColStretch(0, 1);
 
-            buttons.set({&gammaBg, &colorBg, nullptr, &sButton, &qButton});
+            buttons.set({&gammaBg, &colorBg});
             buttons.setColStretch(2, 1);
             if (!(init.color >> 24))
                 colorBg.toggle();
@@ -244,8 +244,6 @@ namespace appui {
                 set(0, 1, show ? &colorTab : nullptr);
                 return onColor(color() & (show ? 0xFFFFFFFFu : 0x00FFFFFFu));
             });
-            sButton.onClick.addForever([this]{ return onSettings(); });
-            qButton.onClick.addForever([this]{ return onQuit(); });
 
             brightnessGrid.set({&bvLabel.pad, &bvSlider.pad,
                                 &baLabel.pad, &baSlider.pad});
@@ -281,8 +279,6 @@ namespace appui {
     public:
         util::event<setting, double> onChange;
         util::event<uint32_t> onColor;
-        util::event<> onSettings;
-        util::event<> onQuit;
 
     private:
         uint32_t color() const {
@@ -290,15 +286,11 @@ namespace appui {
         }
 
     private:
-        ui::grid buttons{5, 1};
+        ui::grid buttons{3, 1};
         padded_label gammaLabel{{5, 5}, {L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         padded_label colorLabel{{7, 5}, {L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        padded_label sLabel{{5, 5}, {L"\uf013", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        padded_label qLabel{{5, 5}, {L"\uf011", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         ui::borderless_button gammaButton{gammaLabel.pad};
         ui::borderless_button colorButton{colorLabel.pad};
-        ui::borderless_button sButton{sLabel.pad};
-        ui::borderless_button qButton{qLabel.pad};
         gray_bg gammaBg{gammaButton};
         gray_bg colorBg{colorButton};
 
@@ -565,18 +557,7 @@ int ui::main() {
         }
     };
 
-    sizingConfig.onChange.addForever([&](int i, size_t value) {
-        switch (i) {
-            case 0: config.width = value; break;
-            case 1: config.height = value; break;
-            case 2: config.musicLeds = value; break;
-            case 3: config.serial = value; break;
-        }
-        setTestPattern();
-    });
-
-    tooltipConfig.onQuit.addForever([&] { mainWindow.close(); });
-    tooltipConfig.onSettings.addForever([&] {
+    auto showSizeConfig = [&] {
         mainWindow.clearNotificationIcon();
         auto w = GetSystemMetrics(SM_CXSCREEN);
         auto h = GetSystemMetrics(SM_CYSCREEN);
@@ -588,6 +569,16 @@ int ui::main() {
         sizingWindow->onClose.addForever([&]{ setBothPatterns(); });
         sizingWindow->setShadow(true);
         sizingWindow->show();
+        setTestPattern();
+    };
+
+    sizingConfig.onChange.addForever([&](int i, size_t value) {
+        switch (i) {
+            case 0: config.width = value; break;
+            case 1: config.height = value; break;
+            case 2: config.musicLeds = value; break;
+            case 3: config.serial = value; break;
+        }
         setTestPattern();
     });
     tooltipConfig.onChange.addForever([&](appui::setting s, double v) {
@@ -602,11 +593,23 @@ int ui::main() {
         // Ping the serial thread.
         updateLocked([&]{ });
     });
-    tooltipConfig.onColor.addForever([&](uint32_t c) {
-        setVideoPattern(config.color = c);
-    });
+    tooltipConfig.onColor.addForever([&](uint32_t c) { setVideoPattern(config.color = c); });
+
+    winapi::holder<HMENU, DestroyMenu> menu{CreatePopupMenu()};
+    winapi::throwOnFalse(AppendMenu(menu.get(), MF_STRING, 1, L"Reconfigure..."));
+    winapi::throwOnFalse(AppendMenu(menu.get(), MF_STRING, 2, L"Quit"));
 
     mainWindow.onNotificationIcon.addForever([&](POINT p, bool primary) {
+        if (tooltipWindow)
+            tooltipWindow.reset();
+        if (!primary) {
+            mainWindow.focus();
+            switch (TrackPopupMenuEx(menu.get(), TPM_RETURNCMD|TPM_NONOTIFY|TPM_RIGHTBUTTON, p.x, p.y, mainWindow, nullptr)) {
+                case 1: showSizeConfig(); break;
+                case 2: mainWindow.close(); break;
+            }
+            return;
+        }
         ui::window::gravity hGravity = ui::window::gravity_start;
         ui::window::gravity vGravity = ui::window::gravity_start;
         POINT size = tooltipConfig.measure({500, 0});
@@ -642,7 +645,7 @@ int ui::main() {
     });
 
     if (!initialized)
-        tooltipConfig.onSettings();
+        showSizeConfig();
     else
         setBothPatterns();
     return ui::dispatch();
