@@ -48,3 +48,12 @@ static DOUBLEX4 ahsv2argb(DOUBLEX4 x) {
          : i == 4 ? DOUBLEX4{a, q, m, v}
          : /* 6 */  DOUBLEX4{a, v, m, p};
 }
+
+static DOUBLEX4 k2argb(double t) {
+    t /= 100; // http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code/
+    auto r = std::max(0., std::min(1., t < 66 ? 1. : 1.292936186062745 * pow(t - 60, -0.1332047592)));
+    auto g = std::max(0., std::min(1., t < 66 ? 0.3900815787690196 * log(t) - 0.6318414437886275
+                                              : 1.129890860895294 * pow(t - 60, -0.0755148492)));
+    auto b = std::max(0., std::min(1., t > 66 ? 1. : t < 19 ? 0. : 0.543206789110196 * log(t - 10) - 1.19625408914));
+    return {1, r, g, b};
+}

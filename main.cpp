@@ -28,9 +28,7 @@ namespace appui {
         std::atomic<double> brightnessV;
         std::atomic<double> brightnessA;
         std::atomic<double> gamma;
-        std::atomic<double> dr;
-        std::atomic<double> dg;
-        std::atomic<double> db;
+        std::atomic<double> temperature;
         uint32_t color;
     };
 
@@ -221,7 +219,7 @@ namespace appui {
         bool enabled = true;
     };
 
-    enum setting { Y, R, G, B, Lv, La };
+    enum setting { Y, T, Lv, La };
 
     struct tooltip_config : ui::grid {
         tooltip_config(const state& init)
@@ -253,18 +251,12 @@ namespace appui {
             baSlider.onChange.addForever([this](double v) { return onChange(La, v); });
 
             gammaGrid.set({&yLabel.pad, &ySlider.pad,
-                           &rLabel.pad, &rSlider.pad,
-                           &gLabel.pad, &gSlider.pad,
-                           &bLabel.pad, &bSlider.pad});
+                           &tLabel.pad, &tSlider.pad});
             gammaGrid.setColStretch(1, 1);
-            ySlider.setValue((init.gamma - 1) / 2); // use gamma from 1 to 3
-            rSlider.setValue(init.dr);
-            gSlider.setValue(init.dg);
-            bSlider.setValue(init.db);
+            ySlider.setValue((init.gamma - 1) / 2); // gamma <- [1..3]
+            tSlider.setValue(pow((init.temperature - 1000) / 19000, 0.5673756656029532)); // temperature <- [1000..20000]
             ySlider.onChange.addForever([&](double value) { return onChange(Y, value * 2 + 1); });
-            rSlider.onChange.addForever([&](double value) { return onChange(R, value); });
-            gSlider.onChange.addForever([&](double value) { return onChange(G, value); });
-            bSlider.onChange.addForever([&](double value) { return onChange(B, value); });
+            tSlider.onChange.addForever([&](double value) { return onChange(T, pow(value, 1.7625006862733437) * 19000 + 1000); });
 
             colorGrid.set({&hueSlider.pad, &satSlider.pad});
             colorGrid.setColStretch(0, 1);
@@ -300,15 +292,11 @@ namespace appui {
         padded<texslider<2>> bvSlider{{10, 10, 10, 10}};
         padded<texslider<2>> baSlider{{10, 10, 10, 10}};
 
-        padded<ui::grid> gammaGrid{{10, 10, 10, 10}, 2, 4};
+        padded<ui::grid> gammaGrid{{10, 10, 10, 10}, 2, 2};
         padded_label yLabel{{10, 10, 10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
-        padded_label rLabel{{10, 10, 10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFFFF3333u}};
-        padded_label gLabel{{10, 10, 10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF33FF33u}};
-        padded_label bLabel{{10, 10, 10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF3333FFu}};
+        padded_label tLabel{{10, 10, 10, 10}, {L"\uf2c9", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
         padded<ui::slider> ySlider{{10, 10, 10, 10}};
-        padded<ui::slider> rSlider{{10, 10, 10, 10}};
-        padded<ui::slider> gSlider{{10, 10, 10, 10}};
-        padded<ui::slider> bSlider{{10, 10, 10, 10}};
+        padded<texslider<3>> tSlider{{10, 10, 10, 10}};
         gray_bg gammaTab{gammaGrid.pad};
 
         padded<ui::grid> colorGrid{{10, 10, 10, 10}, 1, 2};
@@ -320,7 +308,7 @@ namespace appui {
 
 int ui::main() {
     bool initialized = false;
-    appui::state defaultConfig = {16, 9, 20, 3, 0.7, 0.4, 2.0, 1.0, 1.0, 1.0, 0x00FFFFFFu};
+    appui::state defaultConfig = {16, 9, 20, 3, 0.7, 0.4, 2.0, 6600.0, 0x00FFFFFFu};
     appui::state config;
 
     wchar_t configPath[MAX_PATH];
@@ -480,16 +468,16 @@ int ui::main() {
                 for (uint8_t strip = 0; strip < 4; strip++) {
                     comm.update(strip, frameData[strip], [
                         brightness = strip < 2 ? config.brightnessV.load() : config.brightnessA.load(),
-                        gamma = config.gamma.load(), dr = config.dr.load(), dg = config.dg.load(), db = config.db.load()
+                        gamma = config.gamma.load(), ts = k2argb(config.temperature)
                     ](uint32_t color) {
                         auto [a, r, g, b] = u2qd(color);
                         // Naively applying round((x * brightness / 255) ^ gamma * 255) for each component
                         // can multiply relative differences due to rounding errors, e.g. 16, 17, 16 (barely
                         // greenish dark gray) at gamma 2.0 and brightness = 70% will become 0, 1, 0 (obvious
                         // dark green). To avoid this, round the differences instead.
-                        g = pow(g * brightness, gamma + dg - 1) * dg;
-                        r = pow(r * brightness, gamma + dr - 1) * dr - g;
-                        b = pow(b * brightness, gamma + db - 1) * db - g;
+                        g = pow(g * brightness * ts._3, gamma);
+                        r = pow(r * brightness * ts._2, gamma) - g;
+                        b = pow(b * brightness * ts._4, gamma) - g;
                         return LED(round(r * 255) + round(g * 255), round(g * 255), round(b * 255) + round(g * 255));
                     });
                 }
@@ -584,9 +572,7 @@ int ui::main() {
     tooltipConfig.onChange.addForever([&](appui::setting s, double v) {
         switch (s) {
             case appui::Y: config.gamma = v; break;
-            case appui::R: config.dr = v; break;
-            case appui::G: config.dg = v; break;
-            case appui::B: config.db = v; break;
+            case appui::T: config.temperature = v; break;
             case appui::Lv: config.brightnessV = v; break;
             case appui::La: config.brightnessA = v; break;
         }
