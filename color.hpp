@@ -50,10 +50,12 @@ static DOUBLEX4 ahsv2argb(DOUBLEX4 x) {
 }
 
 static DOUBLEX4 k2argb(double t) {
-    t /= 100; // http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code/
-    auto r = std::max(0., std::min(1., t < 66 ? 1. : 1.292936186062745 * pow(t - 60, -0.1332047592)));
-    auto g = std::max(0., std::min(1., t < 66 ? 0.3900815787690196 * log(t) - 0.6318414437886275
-                                              : 1.129890860895294 * pow(t - 60, -0.0755148492)));
-    auto b = std::max(0., std::min(1., t > 66 ? 1. : t < 19 ? 0. : 0.543206789110196 * log(t - 10) - 1.19625408914));
+    t /= 100; // http://www.zombieprototypes.com/?p=210
+#define LC(a, b, c, d) (a) + (b) * (t - d) + (c) * log(t - d)
+    auto r = std::max(0., std::min(1., t < 66 ? 1. : LC(1.3803015908551253, 0.0004478684462124118, -0.15785750232675008, 55)));
+    auto g = std::max(0., std::min(1., t < 66 ? LC(-0.6088425710866344, -0.001748900018414868, 0.4097731842899564, 2)
+                                              : LC(1.2762722061615583, 0.0003115080994769546, -0.11013841706194392, 50)));
+    auto b = std::max(0., std::min(1., t < 66 ? LC(-0.9990954974165059, 0.0032447435545127036, 0.453646839257496, 10) : 1));
+#undef LC
     return {1, r, g, b};
 }
