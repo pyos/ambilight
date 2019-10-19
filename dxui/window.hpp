@@ -56,7 +56,7 @@ namespace ui {
         void move(RECT p) { MoveWindow(*this, p.left, p.top, p.right - p.left, p.bottom - p.top, TRUE); }
 
         // Make this the active window.
-        void focus() { SetFocus(*this); }
+        void focus() { SetForegroundWindow(*this), SetFocus(*this); }
 
         // Whether the window is visible, i.e. not hidden or minimized.
         bool isVisible() const { return IsWindowVisible(*this); }
