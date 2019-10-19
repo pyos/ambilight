@@ -37,17 +37,16 @@ namespace appui {
     template <typename T>
     struct padded : T {
         template <typename... Args>
-        padded(POINT padding, Args&&... args)
+        padded(RECT padding, Args&&... args)
             : T(std::forward<Args>(args)...)
-            , pad({padding.x, padding.y, padding.x, padding.y}, *this)
-        {
-        }
+            , pad(padding, *this)
+        {}
 
         ui::spacer pad;
     };
 
     struct padded_label : padded<ui::label> {
-        padded_label(POINT padding, const ui::text_part& text)
+        padded_label(RECT padding, const ui::text_part& text)
             : padded<ui::label>{padding, std::vector<ui::text_part>{text}}
         {}
     };
@@ -93,8 +92,8 @@ namespace appui {
         ui::label numLabel{{{L"", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
         ui::label decLabel{{{L"\uf068", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
         ui::label incLabel{{{L"\uf067", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
-        padded<ui::borderless_button> decButton{{5, 0}, decLabel};
-        padded<ui::borderless_button> incButton{{5, 0}, incLabel};
+        padded<ui::borderless_button> decButton{{5, 0, 5, 0}, decLabel};
+        padded<ui::borderless_button> incButton{{5, 0, 5, 0}, incLabel};
         ui::slider slider;
         std::wstring numBuffer;
     };
@@ -180,11 +179,11 @@ namespace appui {
 
     private:
         screensetup image;
-        padded_label helpLabel{{40, 0}, {L"Tweak the values until you get the pattern shown above.",
-                                         ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 22}};
-        padded_label doneLabel{{20, 0}, {L"Done", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}};
-        padded<ui::grid> sliderGrid{{40, 40}, 5, 4};
-        padded<ui::grid> bottomRow{{40, 40}, 6, 1};
+        padded_label helpLabel{{40, 0, 40, 0}, {L"Tweak the values until you get the pattern shown above.",
+                                                ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 22}};
+        padded_label doneLabel{{20, 0, 20, 0}, {L"Done", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}};
+        padded<ui::grid> sliderGrid{{40, 40, 40, 40}, 5, 4};
+        padded<ui::grid> bottomRow{{40, 40, 40, 40}, 6, 1};
         ui::button done{doneLabel.pad};
         static constexpr size_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
         controlled_number w{sliderGrid, 0, L"Screen width",  1, LIMIT * 4 / 5, 1, true};
@@ -229,12 +228,12 @@ namespace appui {
             : ui::grid(1, 4)
         {
             set(0, 1, init.color >> 24 ? &colorTab : nullptr);
-            set(0, 2, &brightnessGrid.pad);
-            set(0, 3, &buttons);
+            set(0, 2, &buttons);
+            set(0, 3, &brightnessGrid.pad);
             setColStretch(0, 1);
 
-            buttons.set({&gammaBg, &colorBg});
-            buttons.setColStretch(2, 1);
+            buttons.set({&title.pad, nullptr, &gammaBg, &colorBg});
+            buttons.setColStretch(1, 1);
             if (!(init.color >> 24))
                 colorBg.toggle();
             gammaBg.toggle();
@@ -286,34 +285,35 @@ namespace appui {
         }
 
     private:
-        ui::grid buttons{3, 1};
-        padded_label gammaLabel{{5, 5}, {L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
-        padded_label colorLabel{{7, 5}, {L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
+        ui::grid buttons{4, 1};
+        padded_label title{{20, 5, 0, 0}, {L"Ambilight", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}};
+        padded_label gammaLabel{{10, 5, 10, 5}, {L"\uf0d0", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
+        padded_label colorLabel{{12, 5, 12, 5}, {L"\uf043", ui::font::loadPermanently<IDI_FONT_ICONS>()}};
         ui::borderless_button gammaButton{gammaLabel.pad};
         ui::borderless_button colorButton{colorLabel.pad};
         gray_bg gammaBg{gammaButton};
         gray_bg colorBg{colorButton};
 
-        padded<ui::grid> brightnessGrid{{10, 10}, 2, 2};
-        padded_label bvLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
-        padded_label baLabel{{10, 10}, {L"\uf001", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
-        padded<texslider<2>> bvSlider{{10, 10}};
-        padded<texslider<2>> baSlider{{10, 10}};
+        padded<ui::grid> brightnessGrid{{10, 0, 10, 10}, 2, 2};
+        padded_label bvLabel{{10, 10, 10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded_label baLabel{{10, 10, 10, 10}, {L"\uf001", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded<texslider<2>> bvSlider{{10, 10, 10, 10}};
+        padded<texslider<2>> baSlider{{10, 10, 10, 10}};
 
-        padded<ui::grid> gammaGrid{{10, 10}, 2, 4};
-        padded_label yLabel{{10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
-        padded_label rLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFFFF3333u}};
-        padded_label gLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF33FF33u}};
-        padded_label bLabel{{10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF3333FFu}};
-        padded<ui::slider> ySlider{{10, 10}};
-        padded<ui::slider> rSlider{{10, 10}};
-        padded<ui::slider> gSlider{{10, 10}};
-        padded<ui::slider> bSlider{{10, 10}};
+        padded<ui::grid> gammaGrid{{10, 10, 10, 10}, 2, 4};
+        padded_label yLabel{{10, 10, 10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded_label rLabel{{10, 10, 10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFFFF3333u}};
+        padded_label gLabel{{10, 10, 10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF33FF33u}};
+        padded_label bLabel{{10, 10, 10, 10}, {L"\uf185", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22, 0xFF3333FFu}};
+        padded<ui::slider> ySlider{{10, 10, 10, 10}};
+        padded<ui::slider> rSlider{{10, 10, 10, 10}};
+        padded<ui::slider> gSlider{{10, 10, 10, 10}};
+        padded<ui::slider> bSlider{{10, 10, 10, 10}};
         gray_bg gammaTab{gammaGrid.pad};
 
-        padded<ui::grid> colorGrid{{10, 10}, 1, 2};
-        padded<texslider<0>> hueSlider{{10, 10}};
-        padded<texslider<1>> satSlider{{10, 10}};
+        padded<ui::grid> colorGrid{{10, 10, 10, 10}, 1, 2};
+        padded<texslider<0>> hueSlider{{10, 10, 10, 10}};
+        padded<texslider<1>> satSlider{{10, 10, 10, 10}};
         gray_bg colorTab{colorGrid.pad};
     };
 }
