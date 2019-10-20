@@ -30,6 +30,7 @@ namespace appui {
         std::atomic<double> gamma;
         std::atomic<double> temperature;
         uint32_t color;
+        std::atomic<double> minLevel;
     };
 
     template <typename T>
@@ -219,7 +220,7 @@ namespace appui {
         bool enabled = true;
     };
 
-    enum setting { Y, T, Lv, La };
+    enum setting { Y, T, Lv, La, Lm };
 
     struct tooltip_config : ui::grid {
         tooltip_config(const state& init)
@@ -251,12 +252,15 @@ namespace appui {
             baSlider.onChange.addForever([this](double v) { return onChange(La, v); });
 
             gammaGrid.set({&yLabel.pad, &ySlider.pad,
-                           &tLabel.pad, &tSlider.pad});
+                           &tLabel.pad, &tSlider.pad,
+                           nullptr,     &mSlider.pad});
             gammaGrid.setColStretch(1, 1);
             ySlider.setValue((init.gamma - 1) / 2); // gamma <- [1..3]
             tSlider.setValue(pow((init.temperature - 1000) / 19000, 0.5673756656029532)); // temperature <- [1000..20000]
+            mSlider.setValue(init.minLevel * 32); // minLevel <- [0..32]
             ySlider.onChange.addForever([&](double value) { return onChange(Y, value * 2 + 1); });
             tSlider.onChange.addForever([&](double value) { return onChange(T, pow(value, 1.7625006862733437) * 19000 + 1000); });
+            mSlider.onChange.addForever([&](double value) { return onChange(Lm, value / 32); });
 
             colorGrid.set({&hueSlider.pad, &satSlider.pad});
             colorGrid.setColStretch(0, 1);
@@ -292,11 +296,12 @@ namespace appui {
         padded<texslider<2>> bvSlider{{10, 10, 10, 10}};
         padded<texslider<2>> baSlider{{10, 10, 10, 10}};
 
-        padded<ui::grid> gammaGrid{{10, 10, 10, 10}, 2, 2};
+        padded<ui::grid> gammaGrid{{10, 10, 10, 10}, 2, 3};
         padded_label yLabel{{10, 10, 10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
         padded_label tLabel{{10, 10, 10, 10}, {L"\uf2c9", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
         padded<ui::slider> ySlider{{10, 10, 10, 10}};
         padded<texslider<3>> tSlider{{10, 10, 10, 10}};
+        padded<texslider<2>> mSlider{{10, 10, 10, 10}};
         gray_bg gammaTab{gammaGrid.pad};
 
         padded<ui::grid> colorGrid{{10, 10, 10, 10}, 1, 2};
@@ -320,7 +325,7 @@ int ui::main() {
         DWORD result;
         winapi::handle file{CreateFile(configPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)};
         winapi::throwOnFalse(file);
-        winapi::throwOnFalse(ReadFile(file.get(), &config, sizeof(config), &result, nullptr) && result == sizeof(config));
+        winapi::throwOnFalse(ReadFile(file.get(), &config, sizeof(config), &result, nullptr));
         initialized = true;
     } catch (const std::exception&) {
         memcpy(&config, &defaultConfig, sizeof(config));
@@ -468,16 +473,17 @@ int ui::main() {
                 for (uint8_t strip = 0; strip < 4; strip++) {
                     comm.update(strip, frameData[strip], [
                         brightness = strip < 2 ? config.brightnessV.load() : config.brightnessA.load(),
-                        gamma = config.gamma.load(), ts = k2argb(config.temperature)
+                        gamma = config.gamma.load(), ts = k2argb(config.temperature),
+                        mb = strip < 2 ? pow(config.minLevel, 1 / config.gamma) : 0
                     ](uint32_t color) {
                         auto [a, r, g, b] = u2qd(color);
                         // Naively applying round((x * brightness / 255) ^ gamma * 255) for each component
                         // can multiply relative differences due to rounding errors, e.g. 16, 17, 16 (barely
                         // greenish dark gray) at gamma 2.0 and brightness = 70% will become 0, 1, 0 (obvious
                         // dark green). To avoid this, round the differences instead.
-                        g = pow(g * brightness * ts._3, gamma);
-                        r = pow(r * brightness * ts._2, gamma) - g;
-                        b = pow(b * brightness * ts._4, gamma) - g;
+                        g = pow(g * brightness * ts._3 * (1 - mb) + mb, gamma);
+                        r = pow(r * brightness * ts._2 * (1 - mb) + mb, gamma) - g;
+                        b = pow(b * brightness * ts._4 * (1 - mb) + mb, gamma) - g;
                         return LED(round(r * 255) + round(g * 255), round(g * 255), round(b * 255) + round(g * 255));
                     });
                 }
@@ -575,6 +581,7 @@ int ui::main() {
             case appui::T: config.temperature = v; break;
             case appui::Lv: config.brightnessV = v; break;
             case appui::La: config.brightnessA = v; break;
+            case appui::Lm: config.minLevel = v; break;
         }
         // Ping the serial thread.
         updateLocked([&]{ });
