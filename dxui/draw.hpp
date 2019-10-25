@@ -105,7 +105,7 @@ namespace ui {
         // Copy a rectangle from one texture to another without any processing.
         void copy(ID3D11Texture2D* target, ID3D11Texture2D* source, RECT from, POINT to) {
             D3D11_BOX box = {(UINT)from.left, (UINT)from.top, 0, (UINT)from.right, (UINT)from.bottom, 1};
-            context->CopySubresourceRegion(target, to.x, to.y, 0, 0, source, 0, &box);
+            context->CopySubresourceRegion(target, 0, to.x, to.y, 0, source, 0, &box);
         }
 
         void copy(ID3D11Texture2D* target, ID3D11Texture2D* source, RECT from) {
