@@ -64,6 +64,9 @@ namespace ui {
         // Whether this window is maximized, duh.
         bool isMaximized() const { return IsZoomed(*this); }
 
+        // Return the current display's scale factor, in percent.
+        uint32_t scale() const { return scaleFactor; }
+
         // Set the window title.
         void setTitle(const wchar_t* value) { winapi::throwOnFalse(SetWindowText(*this, value)); }
 
