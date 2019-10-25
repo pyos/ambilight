@@ -83,17 +83,20 @@ struct ScreenCapturer : IVideoCapturer {
         // The most expensive operation is `GenerateMips`, which cannot be clipped to update
         // a specific region only. At least we can discard the update entirely if it is
         // in the middle of the screen.
-        for (const auto& move : meta<false>())
+        for (const auto& move : meta<false>()) {
             needUpdate |= rx >= move.DestinationRect.left || rx + move.DestinationRect.right  >= src.right
                        || ry >= move.DestinationRect.top  || ry + move.DestinationRect.bottom >= src.bottom;
-        for (const auto& dirty : meta<true>())
+            res.copy(complete, complete, ui::moveRectTo(move.DestinationRect, move.SourcePoint),
+                     {move.DestinationRect.left, move.DestinationRect.top});
+        }
+        for (const auto& dirty : meta<true>()) {
             needUpdate |= rx >= dirty.left || rx + dirty.right  >= src.right
                        || ry >= dirty.top  || ry + dirty.bottom >= src.bottom;
+            res.copy(complete, frame, dirty);
+        }
         if (!needUpdate)
             return {};
 
-        // Can't subsample from `frame` because it probably doesn't have `D3D11_RESOURCE_MISC_GENERATE_MIPS`.
-        res.copy(complete, frame, src);
         ui::vertex vs[] = {
             QUADP(0, 0, dst.right, dst.bottom, 0, 0, 0, src.right, src.bottom),
             QUADP(dst.right, dst.bottom, 0, 0, 0, 0, 0, src.right, src.bottom),

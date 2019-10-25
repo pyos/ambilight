@@ -84,6 +84,10 @@ namespace ui {
         return a.left >= b.left && a.top >= b.top && a.right <= b.right && a.bottom <= b.bottom;
     }
 
+    static constexpr RECT moveRectTo(RECT r, POINT p) {
+        return {p.x, p.y, p.x + (r.right - r.left), p.y + (r.bottom - r.top)};
+    }
+
     struct vertex {
         DirectX::XMFLOAT3 pos;
         DirectX::XMFLOAT4 clr;
@@ -99,9 +103,13 @@ namespace ui {
         }
 
         // Copy a rectangle from one texture to another without any processing.
-        void copy(ID3D11Texture2D* target, ID3D11Texture2D* source, RECT from, POINT to = {0, 0}) {
+        void copy(ID3D11Texture2D* target, ID3D11Texture2D* source, RECT from, POINT to) {
             D3D11_BOX box = {(UINT)from.left, (UINT)from.top, 0, (UINT)from.right, (UINT)from.bottom, 1};
             context->CopySubresourceRegion(target, to.x, to.y, 0, 0, source, 0, &box);
+        }
+
+        void copy(ID3D11Texture2D* target, ID3D11Texture2D* source, RECT from) {
+            copy(target, source, from, {from.left, from.top});
         }
 
         // Clear a region of a texture, setting all pixels in it to the specified ARGB color.
