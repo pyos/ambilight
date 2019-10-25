@@ -116,7 +116,7 @@ void setup() {
 }
 
 void loop() {
-  for (byte i = 0; !Serial.find("<RGBDATA"); i++) {
+  for (byte i = 1; !Serial.find("<RGBDATA"); i++) {
     if (i % 4 /* seconds */ == 0) {
       memset(data, 0, sizeof(data));
       // TODO there's 256 bytes in EEPROM, maybe store a simple default pattern there?
