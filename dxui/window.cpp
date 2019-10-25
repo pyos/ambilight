@@ -246,8 +246,13 @@ void ui::window::drawImmediate(RECT scheduled) {
         swapChain->GetDesc(&swapChainDesc);
         winapi::throwOnFalse(swapChain->ResizeBuffers(swapChainDesc.BufferCount, w, h, swapChainDesc.BufferDesc.Format, swapChainDesc.Flags));
         scheduled = {0, 0, w, h};
+        lastPainted = rectIntersection(lastPainted, scheduled);
     }
 
+    RECT dirtyRects[] = {scheduled, lastPainted};
+    DXGI_PRESENT_PARAMETERS presentInfo = {};
+    presentInfo.DirtyRectsCount = 1;
+    presentInfo.pDirtyRects = dirtyRects;
     auto target = COMv(ID3D11Texture2D, swapChain->GetBuffer, 0);
     if (!isSubRect(lastPainted, scheduled)) {
         // We're in flip mode, so the current back buffer contains outdated state,
@@ -256,11 +261,12 @@ void ui::window::drawImmediate(RECT scheduled) {
         // TODO copy from the other buffer directly somehow
         context.clear(target, lastPainted, background);
         if (root) root->draw(context, target, {0, 0, size.x, size.y}, lastPainted);
+        presentInfo.DirtyRectsCount++;
     }
     context.clear(target, scheduled, background);
     if (root) root->draw(context, target, {0, 0, size.x, size.y}, scheduled);
     lastPainted = scheduled;
-    winapi::throwOnFalse(swapChain->Present(1, 0));
+    winapi::throwOnFalse(swapChain->Present1(1, 0, &presentInfo));
 }
 
 uint32_t ui::systemColor(ui::system_color c) {
