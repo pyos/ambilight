@@ -197,7 +197,7 @@ ui::window::window(int w, int h, int x, int y, window* parent) {
     // Request a WM_NCCALCSIZE so that Windows knows we don't want a frame.
     SetWindowPos(*this, HWND_NOTOPMOST, 0, 0, w, h, SWP_DRAWFRAME|SWP_NOMOVE);
 
-    auto dxgiDevice = COMi(IDXGIDevice, context.raw()->QueryInterface);
+    auto dxgiDevice = context.raw().reinterpret<IDXGIDevice>();
     auto dxgiAdapter = COMi(IDXGIAdapter, dxgiDevice->GetParent);
     auto dxgiFactory = COMi(IDXGIFactory2, dxgiAdapter->GetParent);
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};

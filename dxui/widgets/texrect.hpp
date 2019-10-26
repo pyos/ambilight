@@ -136,7 +136,7 @@ namespace ui {
 
     private:
         winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
-            return ctx.cachedTexture<F>(); }
+            return ctx.cached<ID3D11Texture2D, F>(); }
         RECT getOuter() const override { return outer; }
         RECT getInner() const override { return inner; }
         RECT outer, inner;

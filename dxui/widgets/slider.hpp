@@ -79,7 +79,7 @@ namespace ui {
 
     protected:
         virtual winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const {
-            return ctx.cachedTexture<builtinTexture>(); }
+            return ctx.cached<ID3D11Texture2D, builtinTexture>(); }
         virtual RECT getTrack() const { return builtinRect(SLIDER_TRACK); }
         virtual RECT getGroove() const { return builtinRect(SLIDER_GROOVE); }
         virtual RECT getFilled() const { return builtinRect(SLIDER_FILLED); }

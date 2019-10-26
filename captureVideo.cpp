@@ -9,10 +9,10 @@ struct ScreenCapturer : IVideoCapturer {
     ScreenCapturer(UINT output, UINT w, UINT h)
         : collected(w * h)
     {
-        auto dxgiDevice = COMi(IDXGIDevice, res.raw()->QueryInterface);
+        auto dxgiDevice = res.raw().reinterpret<IDXGIDevice>();
         auto dxgiAdapter = COMi(IDXGIAdapter, dxgiDevice->GetParent);
         auto dxgiOutput = COMe(IDXGIOutput, dxgiAdapter->EnumOutputs, output);
-        auto dxgiOutput1 = COMi(IDXGIOutput1, dxgiOutput->QueryInterface);
+        auto dxgiOutput1 = dxgiOutput.reinterpret<IDXGIOutput1>();
         display = COMe(IDXGIOutputDuplication, dxgiOutput1->DuplicateOutput, res.raw());
         DXGI_OUTPUT_DESC displayDesc;
         dxgiOutput->GetDesc(&displayDesc);
@@ -67,7 +67,7 @@ struct ScreenCapturer : IVideoCapturer {
         needRelease = true;
         if (!frameInfo.TotalMetadataBufferSize)
             return {}; // No changes from last frame. (Probably moved the pointer.)
-        auto frame = COMi(ID3D11Texture2D, resource->QueryInterface);
+        auto frame = resource.reinterpret<ID3D11Texture2D>();
         metadata.resize(frameInfo.TotalMetadataBufferSize);
 
         D3D11_TEXTURE2D_DESC originalDesc;
@@ -112,7 +112,7 @@ struct ScreenCapturer : IVideoCapturer {
         res.draw(rescaled1, rescaled2, vs3, dst, ui::dxcontext::blur);
         res.copy(cpuReadTarget, rescaled1, dst);
 
-        auto readSurface = COMi(IDXGISurface, cpuReadTarget->QueryInterface);
+        auto readSurface = cpuReadTarget.reinterpret<IDXGISurface>();
         DXGI_MAPPED_RECT mapped;
         winapi::throwOnFalse(readSurface->Map(&mapped, DXGI_MAP_READ));
         DEFER { readSurface->Unmap(); };

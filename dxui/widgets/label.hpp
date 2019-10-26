@@ -34,7 +34,7 @@ namespace ui {
         }
 
         winapi::com_ptr<ID3D11Texture2D> loadTexture(ui::dxcontext& ctx) const {
-            return ctx.cachedTexture((uintptr_t)this, [&]{ return ctx.textureFromPNG(texture); });
+            return ctx.cached<ID3D11Texture2D>((uintptr_t)this, [&]{ return ctx.textureFromPNG(texture); });
         }
 
         // Return the native font size, i.e. the size of symbols in texture data.

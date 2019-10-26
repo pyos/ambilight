@@ -60,7 +60,7 @@ RECT ui::builtinRect(builtin_rect r) {
 };
 
 winapi::com_ptr<ID3D11Texture2D> ui::texrect::getTexture(ui::dxcontext& ctx) const {
-    return ctx.cachedTexture<builtinTexture>();
+    return ctx.cached<ID3D11Texture2D, builtinTexture>();
 }
 
 void ui::texrect::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {

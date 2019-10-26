@@ -197,7 +197,7 @@ namespace appui {
     struct texslider : ui::slider {
     protected:
         winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
-            return ctx.cachedTexture<extraWidgets>(); }
+            return ctx.cached<ID3D11Texture2D, extraWidgets>(); }
         RECT getTrack() const override { return {0, 154, 15, 186}; }
         RECT getGroove() const override { return {15, 154 + 6 * i, 128, 157 + 6 * i}; }
         RECT getFilled() const override { return {15, 157 + 6 * i, 128, 160 + 6 * i}; }
@@ -214,7 +214,7 @@ namespace appui {
 
     protected:
         winapi::com_ptr<ID3D11Texture2D> getTexture(ui::dxcontext& ctx) const override {
-            return enabled ? ctx.cachedTexture<extraWidgets>() : winapi::com_ptr<ID3D11Texture2D>{}; }
+            return enabled ? ctx.cached<ID3D11Texture2D, extraWidgets>() : winapi::com_ptr<ID3D11Texture2D>{}; }
         RECT getOuter() const override { return {15, 163, 16, 164}; }
         RECT getInner() const override { return getOuter(); }
         bool enabled = true;

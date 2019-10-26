@@ -98,9 +98,7 @@ namespace ui {
     struct dxcontext {
         dxcontext();
 
-        ID3D11Device* raw() {
-            return device.get();
-        }
+        winapi::com_ptr<ID3D11Device> raw() { return device; }
 
         // Copy a rectangle from one texture to another without any processing.
         void copy(ID3D11Texture2D* target, ID3D11Texture2D* source, RECT from, POINT to) {
@@ -130,23 +128,15 @@ namespace ui {
 
         void regenerateMipMaps(ID3D11Texture2D* texture);
 
-        template <typename F /* = winapi::com_ptr<ID3D11Texture2D>() */>
-        winapi::com_ptr<ID3D11Texture2D> cachedTexture(uintptr_t key, F&& gen) {
-            auto [it, added] = texCache.emplace(key, winapi::com_ptr<ID3D11Texture2D>{});
-            return added ? (it->second = gen()) : it->second;
+        template <typename T, typename F /* = winapi::com_ptr<T>() */>
+        winapi::com_ptr<T> cached(uintptr_t key, F&& f) {
+            auto [it, added] = cache.emplace(key, winapi::com_ptr<IUnknown>());
+            return (added ? (it->second = f().reinterpret<IUnknown>()) : it->second).reinterpret<T>();
         }
 
-        winapi::com_ptr<ID3D11Texture2D> invalidateTexture(uintptr_t key) {
-            texCache.erase(key);
-        }
-
-        template <winapi::com_ptr<ID3D11Texture2D> (*F)(dxcontext&)>
-        winapi::com_ptr<ID3D11Texture2D> cachedTexture() {
-            return cachedTexture((uintptr_t)F, [this]{ return F(*this); });
-        }
-
-        winapi::com_ptr<ID3D11Texture2D> nullTexture() {
-            return cachedTexture(0, [this]{ return textureFromRaw({0, 0, 0, 0}, 1); });
+        template <typename T, winapi::com_ptr<T> (*F)(dxcontext&)>
+        winapi::com_ptr<T> cached() {
+            return cached<T>((uintptr_t)F, [this]{ return F(*this); });
         }
 
     private:
@@ -171,6 +161,6 @@ namespace ui {
         winapi::com_ptr<ID3D11BlendState> blendOver;
         winapi::com_ptr<ID3D11BlendState> blendClear;
         winapi::com_ptr<ID3D11RasterizerState> rState;
-        std::unordered_map<uintptr_t, winapi::com_ptr<ID3D11Texture2D>> texCache;
+        std::unordered_map<uintptr_t, winapi::com_ptr<IUnknown>> cache;
     };
 }

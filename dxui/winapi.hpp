@@ -56,12 +56,15 @@ namespace winapi {
     template <typename T>
     struct com_ptr : std::unique_ptr<T, com_release> {
         com_ptr() = default;
-        // Ambiguous whether the pointer is managed or not. D3D initializers use `operator&` anyway.
-        com_ptr(T*) = delete;
-        com_ptr(com_ptr&&) = default;
+        com_ptr(T*) = delete; // Ambiguous whether the pointer is managed or not.
+        com_ptr(com_ptr&& p) = default;
         com_ptr(const com_ptr& p) : std::unique_ptr<T, com_release>(p.get()) { if (p) p->AddRef(); }
-        com_ptr& operator=(com_ptr&&) = default;
+        com_ptr& operator=(com_ptr&& p) = default;
         com_ptr& operator=(const com_ptr& p) { return *this = com_ptr<T>(p); }
+
+        template <typename F /* = HRESULT(T**) */,
+                  typename R = std::enable_if_t<std::is_same_v<std::invoke_result_t<F, T**>, HRESULT>>>
+        com_ptr(F&& f) { winapi::throwOnFalse(f(reinterpret_cast<T**>(this))); }
 
         operator T*() const {
             return std::unique_ptr<T, com_release>::get();
@@ -71,9 +74,11 @@ namespace winapi {
             return reinterpret_cast<T**>(this);
         }
 
-        template <typename F /* = HRESULT(T**) */,
-                  typename R = std::enable_if_t<std::is_same_v<std::invoke_result_t<F, T**>, HRESULT>>>
-        com_ptr(F&& f) { winapi::throwOnFalse(f(reinterpret_cast<T**>(this))); }
+        template <typename U>
+        com_ptr<U> reinterpret() {
+            return com_ptr<U>([x = static_cast<T*>(*this)](U** __p) {
+                return x->QueryInterface(__uuidof(U), reinterpret_cast<void**>(__p)); });
+        }
     };
 }
 
