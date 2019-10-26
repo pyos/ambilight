@@ -5,6 +5,12 @@
 #include <numeric>
 #include <vector>
 
+#include <dxui/shaders/blur.h>
+
+static winapi::com_ptr<ID3D11PixelShader> blurShader(ui::dxcontext& ctx) {
+    return COMe(ID3D11PixelShader, ctx.raw()->CreatePixelShader, g_blur, ARRAYSIZE(g_blur), nullptr);
+}
+
 struct ScreenCapturer : IVideoCapturer {
     ScreenCapturer(UINT output, UINT w, UINT h)
         : collected(w * h)
@@ -108,8 +114,8 @@ struct ScreenCapturer : IVideoCapturer {
         for (auto& w : vs2) w.blw = 0;
         res.regenerateMipMaps(complete);
         res.draw(rescaled1, complete, {&vs[6 * (rotate * 2 + mirror)], 6}, dst);
-        res.draw(rescaled2, rescaled1, vs2, dst, ui::dxcontext::blur);
-        res.draw(rescaled1, rescaled2, vs3, dst, ui::dxcontext::blur);
+        res.draw(rescaled2, rescaled1, vs2, dst, blur);
+        res.draw(rescaled1, rescaled2, vs3, dst, blur);
         res.copy(cpuReadTarget, rescaled1, dst);
 
         auto readSurface = cpuReadTarget.reinterpret<IDXGISurface>();
@@ -135,6 +141,7 @@ private:
 
 private:
     ui::dxcontext res;
+    winapi::com_ptr<ID3D11PixelShader> blur{res.cached<ID3D11PixelShader, blurShader>()};
     winapi::com_ptr<ID3D11Texture2D> moveTemporary;
     winapi::com_ptr<ID3D11Texture2D> complete;
     winapi::com_ptr<ID3D11Texture2D> rescaled1;

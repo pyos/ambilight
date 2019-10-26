@@ -1,6 +1,8 @@
 #include "data.hpp"
 #include "label.hpp"
 
+#include <dxui/shaders/distance_color.h>
+
 ui::font::font(util::span<const uint8_t> texture, util::span<const char> charmap)
     : texture(texture)
 {
@@ -60,6 +62,10 @@ POINT ui::label::measureImpl(POINT fit) const {
     return {hideOverflow ? std::min((LONG)(tx - sx) + 1, fit.x) : (LONG)(tx - sx) + 1, (LONG)ty + 1};
 }
 
+static winapi::com_ptr<ID3D11PixelShader> distanceShader(ui::dxcontext& ctx) {
+    return COMe(ID3D11PixelShader, ctx.raw()->CreatePixelShader, g_distance_color, ARRAYSIZE(g_distance_color), nullptr);
+}
+
 void ui::label::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const {
     measureMin(); // Make sure the origin X is set to the correct value.
     std::vector<ui::vertex> quads;
@@ -93,7 +99,7 @@ void ui::label::drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total
             }
             for (auto& vertex : quads)
                 vertex.clr = ARGB2CLR(part.fontColor);
-            ctx.draw(target, part.font.get().loadTexture(ctx), quads, dirty, ui::dxcontext::distanceCoded);
+            ctx.draw(target, part.font.get().loadTexture(ctx), quads, dirty, ctx.cached<ID3D11PixelShader, distanceShader>());
         }
     });
 }
