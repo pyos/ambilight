@@ -242,9 +242,7 @@ void ui::window::drawImmediate(RECT scheduled) {
     if (size.x != rect.right - rect.left || size.y != rect.bottom - rect.top) {
         // Fit the swapchain buffer to window size.
         auto [w, h] = size = {std::max(rect.right - rect.left, 1L), std::max(rect.bottom - rect.top, 1L)};
-        DXGI_SWAP_CHAIN_DESC swapChainDesc;
-        swapChain->GetDesc(&swapChainDesc);
-        winapi::throwOnFalse(swapChain->ResizeBuffers(swapChainDesc.BufferCount, w, h, swapChainDesc.BufferDesc.Format, swapChainDesc.Flags));
+        winapi::throwOnFalse(swapChain->ResizeBuffers(0, w, h, DXGI_FORMAT_UNKNOWN, 0));
         scheduled = {0, 0, w, h};
     }
 
