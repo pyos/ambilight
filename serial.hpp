@@ -43,9 +43,14 @@ struct serial {
     }
 
     void submit() {
+        if (!submit(false)) while (!submit(true)) {}
+    }
+
+private:
+    bool submit(bool force) {
         write({'<', 'R', 'G', 'B', 'D', 'A', 'T', 'A'});
         for (size_t strip = 0; strip < 4; strip++) {
-            for (size_t chunk = 0; chunk < AMBILIGHT_CHUNKS_PER_STRIP; chunk++) if (!valid[strip][chunk]) {
+            for (size_t chunk = 0; chunk < AMBILIGHT_CHUNKS_PER_STRIP; chunk++) if (force || !valid[strip][chunk]) {
                 uint8_t tmpb[AMBILIGHT_SERIAL_CHUNK * sizeof(LED) + 1];
                 tmpb[0] = (uint8_t)(strip + chunk * 4);
                 memcpy(tmpb + 1, color[strip][chunk], sizeof(tmpb) - 1);
@@ -53,15 +58,15 @@ struct serial {
                 valid[strip][chunk] = true;
             }
         }
-        write({255});
+        return write({255});
     }
 
-private:
-    void write(util::span<const uint8_t> data) {
+    bool write(util::span<const uint8_t> data) {
         BYTE response;
         DWORD result = (DWORD)data.size();
         winapi::throwOnFalse(WriteFile(handle.get(), &data[0], result, &result, nullptr) && result == data.size());
-        winapi::throwOnFalse(ReadFile(handle.get(), &response, 1, &result, nullptr) && result == 1 && response == '>');
+        winapi::throwOnFalse(ReadFile(handle.get(), &response, 1, &result, nullptr) && result == 1);
+        return response == '>';
     }
 
 private:

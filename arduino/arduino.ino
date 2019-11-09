@@ -2,16 +2,17 @@
 // A general Arduino program to control up to 4 strips of up to AMBILIGHT_CHUNKS_PER_STRIP
 // times AMBILIGHT_SERIAL_CHUNK (default = 120) WS2815 LEDs each over the serial interface.
 //
-// Serial protocol:
-//    R    <RGBDATA    chunk    chunk   ...
-//    S            >        >        >  ...
-// `chunk` begins with a single byte:
-//    * If it is 255, then the strips are refreshed (the response is only sent after
-//      this is done) and the exchange ends. The next exchange should start with <RGBDATA
-//      again.
-//    * Otherwise, it is (chunk index * 4 + strip index) and should be followed by
-//      AMBILIGHT_SERIAL_CHUNK * sizeof(LED) bytes of data. Note that 252, 253 and 254
-//      are never valid start bytes regardless of AMBILIGHT_CHUNKS_PER_STRIP.
+// The data consists of transactions, each a series of request-response pairs.
+// The first request must always be "<RGBDATA", and the response is ">".
+// Requests after that update the LED data: the first byte, 0..251 = (chunk index
+// * 4 + strip index), is followed by AMBILIGHT_SERIAL_CHUNK * ssizeof(LED) bytes
+// of data. The response to these requests is, again, always ">". The last request
+// is a flush:
+//    * 252, 253, and 254 are reserved;
+//    * 255 forces an update of the LED strips. If the response is ">", the strips
+//      are refreshed; if it is "<", there was no previous state, so the refresh
+//      is not done and the next update is expected to send the entire state
+//      of the strips.
 //
 // Strips are driven in pairs (0+1 and 2+3), so total refresh time is 27.9us times
 // [the maximum number of updated LEDs in strips 0 and 1 rounded up to chunk size,
@@ -20,10 +21,10 @@
 // are updated during a single exhange, the refresh time with default chunk size will be
 // (40 + 20) * 27.9us = 1.674ms.
 //
-// NOTE  If incorrect serial data is received, or any data takes more than a second to arrive,
-//       the Arduino will blink its integrated LED.
-//       If no data at all (not even incorrect data) is received for 4 seconds in a row, all
-//       strips will be turned off and strips 2 and 3 will display a dim red light on the first LEDs.
+// NOTE  If incorrect serial data is received, or any data takes more than a second to
+//       arrive, the Arduino will blink its integrated LED. If no data at all (not even
+//       incorrect data) is received for 4 seconds in a row, all strips will be turned
+//       off and strips 2 and 3 will display a dim red light on the first LEDs.
 //
 
 #include "arduino.h"
@@ -108,6 +109,7 @@ static constexpr size_t CHUNK_BYTE_SIZE = AMBILIGHT_SERIAL_CHUNK * sizeof(LED);
 static LED data[4][AMBILIGHT_CHUNKS_PER_STRIP][AMBILIGHT_SERIAL_CHUNK];
 static WS2815Pair strip01{9, 10};
 static WS2815Pair strip23{11, 12};
+static bool valid = false;
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -123,15 +125,21 @@ void loop() {
       data[2][0][0] = data[3][0][0] = LED(10, 0, 0);
       strip01.show((byte*)data[0], (byte*)data[1], CHUNK_BYTE_SIZE * AMBILIGHT_CHUNKS_PER_STRIP);
       strip23.show((byte*)data[2], (byte*)data[3], CHUNK_BYTE_SIZE * AMBILIGHT_CHUNKS_PER_STRIP);
+      valid = false;
     }
   }
   byte index;
   byte ns[] = {0, 0};
   while (Serial.write('>') && Serial.readBytes(&index, 1) == 1) {
     if (index == 255) {
-      if (ns[0]) strip01.show((byte*)data[0], (byte*)data[1], CHUNK_BYTE_SIZE * ns[0]);
-      if (ns[1]) strip23.show((byte*)data[2], (byte*)data[3], CHUNK_BYTE_SIZE * ns[1]);
-      Serial.write('>');
+      if (valid) {
+        if (ns[0]) strip01.show((byte*)data[0], (byte*)data[1], CHUNK_BYTE_SIZE * ns[0]);
+        if (ns[1]) strip23.show((byte*)data[2], (byte*)data[3], CHUNK_BYTE_SIZE * ns[1]);
+        Serial.write('>');
+      } else {
+        Serial.write('<');
+        valid = true;
+      }
       return;
     }
 
@@ -146,4 +154,5 @@ void loop() {
   delay(100);
   digitalWrite(LED_BUILTIN, LOW);
   delay(100);
+  valid = false;
 }
