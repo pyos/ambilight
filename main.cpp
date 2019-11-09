@@ -432,28 +432,24 @@ int ui::main() {
 
     auto audioCaptureThread = loopThread([&] {
         { std::unique_lock<std::timed_mutex> lk(audioMutex); };
-        double lastH = 0;
-        double lastS = 0;
         auto cap = captureDefaultAudioOutput();
         while (!terminate) if (auto in = cap->next()) {
-            // 1. Need a lower bound on value so that the strip is always visible at all. 
-            // 2. When value is 0, both hue and saturation become undefined (all colors are black),
-            //    causing an abrupt switch to white at the end of a fade to black. Keep the old
-            //    hue/saturation when any value is OK to avoid that.
             auto [a, h, s, v] = argb2ahsv(u2qd(averageColor));
-            auto [_, r, g, b] = ahsv2argb({1, (h = lastH = s ? h : lastH), (s = lastS = v ? s : lastS), std::max(v, 0.5)});
-            auto delta = qd2u({0, r * 2 / in.size(), g * 2 / in.size(), b * 2 / in.size()});
             auto lk = std::unique_lock<std::timed_mutex>(audioMutex, std::chrono::milliseconds(30));
             if (!lk)
                 return;
-            updateLocked([&] {
+            // 1. Need a lower bound on value so that the strip is always visible at all. 
+            // 2. Fade to gray at low value to avoid abrupt color changes on fade to black.
+            updateLocked([&, h = h, s = s * std::min(v * 2, 1.), vm = std::max(v * 2, 1.) / in.size()] {
                 size_t j = 0, size = config.musicLeds / 2;
                 for (auto* out : {frameData[2], frameData[3]}) {
                     size_t i = 0;
-                    for (size_t k = in.size() / 2; k--; j++)
+                    for (size_t k = in.size() / 2; k--; j++) {
                         // Yay, hardcoded coefficients! TODO figure out a better mapping.
-                        for (size_t w = (size_t)(tanh(in[j] / exp((k + 1) * 0.55) / 0.12) * (size - i)); w--; )
-                            out[i++] = 0xFF000000u | (delta * (UINT)(k + 1));
+                        auto w = (size_t)(tanh(in[j] / exp((k + 1) * 0.55) / 0.12) * (size - i));
+                        auto c = qd2u(ahsv2argb({1, h, s, vm * (k + 1)}));
+                        while (w--) out[i++] = c;
+                    }
                     while (i < size)
                         out[i++] = 0xFF000000u;
                 }
