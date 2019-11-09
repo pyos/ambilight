@@ -477,10 +477,12 @@ int ui::main() {
                         // can multiply relative differences due to rounding errors, e.g. 16, 17, 16 (barely
                         // greenish dark gray) at gamma 2.0 and brightness = 70% will become 0, 1, 0 (obvious
                         // dark green). To avoid this, round the differences instead.
-                        g = pow(g * brightness * ts._3 * (1 - mb) + mb, gamma);
-                        r = pow(r * brightness * ts._2 * (1 - mb) + mb, gamma) - g;
-                        b = pow(b * brightness * ts._4 * (1 - mb) + mb, gamma) - g;
-                        return LED(round(r * 255) + round(g * 255), round(g * 255), round(b * 255) + round(g * 255));
+                        g = pow((g * brightness * (1 - mb) + mb) * ts._3, gamma);
+                        r = pow((r * brightness * (1 - mb) + mb) * ts._2, gamma) - g;
+                        b = pow((b * brightness * (1 - mb) + mb) * ts._4, gamma) - g;
+                        return LED((int)(round(r * LED::scale) + round(g * LED::scale)),
+                                   (int)(round(g * LED::scale)),
+                                   (int)(round(b * LED::scale) + round(g * LED::scale)));
                     });
                 }
             }

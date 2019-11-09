@@ -37,23 +37,23 @@ struct WS2815Pair {
     , maskA(1 << digital_pin_to_bit_position[pinA])
     , maskB(1 << digital_pin_to_bit_position[pinB])
   {
-    // assert(port == digital_pin_to_port[pin2]);
+    // assert(digital_pin_to_port[pinA] == digital_pin_to_port[pinB]);
     port->DIRSET = maskA | maskB;
     port->OUTCLR = maskA | maskB;
   }
 
-  void show(const byte* A, const byte* B, size_t n) {
+  void show(const uint8_t* A, const uint8_t* B, size_t n) {
     if (!n)
       return;
     // Truncating `micros()` is fine; at worst, this causes a redundant
     // delay once in a while.
     while ((uint16_t)micros() - endTime < 200);
-    byte a = 0, b = 0, z = 0, m = 8;
+    uint8_t a = 0, b = 0, z = 0, m = 8;
     __asm__ volatile (
       "cli"               "\n" // /--------------------- cycles (1 cycle = 50 ns)
     "%=0:"                "\n" // v   nextByte:                             ---+
-      "ld %[a], %a[A]+"   "\n" // 2     byte a = *A++;                         |
-      "ld %[b], %a[B]+"   "\n" // 2     byte b = *B++;                         | 250ns before byte
+      "ld %[a], %a[A]+"   "\n" // 2     uint8_t a = *A++;                      |
+      "ld %[b], %a[B]+"   "\n" // 2     uint8_t b = *B++;                      | 250ns before byte
       "ldi %[m], 8"       "\n" // 1     m = 8;                                 |
     "%=1:"                "\n" //     nextBit:                              ---/
       "lsl %[a]"          "\n" // 1     bool setA = a & 0x80; a <<= 1;         | 250ns before bit
@@ -105,11 +105,63 @@ private:
   uint16_t endTime = 0;
 };
 
+struct SK9822Pair {
+  SK9822Pair(int pinA, int pinB, int clk)
+    : port(&PORTA + digital_pin_to_port[pinA])
+    , maskA(1 << digital_pin_to_bit_position[pinA])
+    , maskB(1 << digital_pin_to_bit_position[pinB])
+    , maskC(1 << digital_pin_to_bit_position[clk])
+  {
+    // assert(digital_pin_to_port[pinA] == digital_pin_to_port[pinB]);
+    // assert(digital_pin_to_port[pinA] == digital_pin_to_port[clk]);
+  }
+
+  void show(const uint8_t* A, const uint8_t* B, size_t n) {
+    // Start frame: 32 zeros
+    // Data: 111xxxxxbbbbbbbbggggggggrrrrrrrr
+    // End frame: max(32, n/2) zeros
+    const uint8_t maskABC = maskA | maskB | maskC;
+    port->OUTCLR = maskA | maskB | maskC;
+    for (int i = 0; i < 32; i++) {
+      port->OUTSET = maskC;
+      port->OUTCLR = maskC;
+    }
+    for (size_t m = n; m--;) {
+      uint8_t a = *A++, b = *B++;
+      for (int i = 0; i < 8; i++) {
+        uint8_t z = 0;
+        // XXX not sure if avr-gcc is smart enough to make this lsl+brcs+or
+        if (a & 0x80) z |= maskA; a <<= 1;
+        if (b & 0x80) z |= maskB; b <<= 1;
+        port->OUTSET = z;
+        port->OUTSET = maskC;
+        port->OUTCLR = maskABC;
+      }
+    }
+    for (size_t m = n > 64 ? n / 2 : 32; m--; ) {
+      port->OUTSET = maskC;
+      port->OUTCLR = maskC;
+    }
+  }
+
+private:
+  PORT_struct* port;
+  uint8_t maskA;
+  uint8_t maskB;
+  uint8_t maskC;
+};
+
 static constexpr size_t CHUNK_BYTE_SIZE = AMBILIGHT_SERIAL_CHUNK * sizeof(LED);
 static LED data[4][AMBILIGHT_CHUNKS_PER_STRIP][AMBILIGHT_SERIAL_CHUNK];
+static bool valid = false;
+
+#if AMBILIGHT_USE_SPI
+static SK9822Pair strip01{9, 10, 5};
+static SK9822Pair strip23{11, 12, 13};
+#else
 static WS2815Pair strip01{9, 10};
 static WS2815Pair strip23{11, 12};
-static bool valid = false;
+#endif
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -118,7 +170,7 @@ void setup() {
 }
 
 void loop() {
-  for (byte i = 1; !Serial.find("<RGBDATA"); i++) {
+  for (uint8_t i = 1; !Serial.find("<RGBDATA"); i++) {
     if (i % 4 /* seconds */ == 0) {
       memset(data, 0, sizeof(data));
       // TODO there's 256 bytes in EEPROM, maybe store a simple default pattern there?
@@ -128,13 +180,13 @@ void loop() {
       valid = false;
     }
   }
-  byte index;
-  byte ns[] = {0, 0};
+  uint8_t index;
+  uint8_t ns[] = {0, 0};
   while (Serial.write('>') && Serial.readBytes(&index, 1) == 1) {
     if (index == 255) {
       if (valid) {
-        if (ns[0]) strip01.show((byte*)data[0], (byte*)data[1], CHUNK_BYTE_SIZE * ns[0]);
-        if (ns[1]) strip23.show((byte*)data[2], (byte*)data[3], CHUNK_BYTE_SIZE * ns[1]);
+        if (ns[0]) strip01.show((const uint8_t*)data[0], (const uint8_t*)data[1], CHUNK_BYTE_SIZE * ns[0]);
+        if (ns[1]) strip23.show((const uint8_t*)data[2], (const uint8_t*)data[3], CHUNK_BYTE_SIZE * ns[1]);
         Serial.write('>');
       } else {
         Serial.write('<');
@@ -143,9 +195,9 @@ void loop() {
       return;
     }
 
-    byte i = index % 4;
-    byte j = index / 4;
-    if (j >= AMBILIGHT_CHUNKS_PER_STRIP || Serial.readBytes((byte*)data[i][j], CHUNK_BYTE_SIZE) != CHUNK_BYTE_SIZE)
+    uint8_t i = index % 4;
+    uint8_t j = index / 4;
+    if (j >= AMBILIGHT_CHUNKS_PER_STRIP || Serial.readBytes((uint8_t*)data[i][j], CHUNK_BYTE_SIZE) != CHUNK_BYTE_SIZE)
       break;
     if (ns[i / 2] <= j)
       ns[i / 2] = j + 1;
