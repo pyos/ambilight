@@ -264,9 +264,9 @@ namespace appui {
 
             colorGrid.set({&hueSlider.pad, &satSlider.pad});
             colorGrid.setColStretch(0, 1);
-            auto [a, h, s, v] = argb2ahsv(u2qd(init.color));
-            hueSlider.setValue(h);
-            satSlider.setValue(s);
+            auto c = rgba2hsva(u2qd(init.color));
+            hueSlider.setValue(c.h);
+            satSlider.setValue(c.s);
             hueSlider.onChange.addForever([&](double) { return onColor(color()); });
             satSlider.onChange.addForever([&](double) { return onColor(color()); });
         }
@@ -277,7 +277,7 @@ namespace appui {
 
     private:
         uint32_t color() const {
-            return qd2u(ahsv2argb({1, hueSlider.value(), satSlider.value(), 1}));
+            return qd2u(hsva2rgba({(float)hueSlider.value(), (float)satSlider.value(), 1, 1}));
         }
 
     private:
@@ -434,20 +434,20 @@ int ui::main() {
         { std::unique_lock<std::timed_mutex> lk(audioMutex); };
         auto cap = captureDefaultAudioOutput();
         while (!terminate) if (auto in = cap->next()) {
-            auto [a, h, s, v] = argb2ahsv(u2qd(averageColor));
+            auto ac = rgba2hsva(u2qd(averageColor));
             auto lk = std::unique_lock<std::timed_mutex>(audioMutex, std::chrono::milliseconds(30));
             if (!lk)
                 return;
             // 1. Need a lower bound on value so that the strip is always visible at all. 
             // 2. Fade to gray at low value to avoid abrupt color changes on fade to black.
-            updateLocked([&, h = h, s = s * std::min(v * 2, 1.), vm = std::max(v * 2, 1.) / in.size()] {
+            updateLocked([&, h = ac.h, s = ac.s * std::min(ac.v * 2, 1.f), vm = std::max(ac.v * 2, 1.f) / in.size()] {
                 size_t j = 0, size = config.musicLeds / 2;
                 for (auto* out : {frameData[2], frameData[3]}) {
                     size_t i = 0;
                     for (size_t k = in.size() / 2; k--; j++) {
                         // Yay, hardcoded coefficients! TODO figure out a better mapping.
                         auto w = (size_t)(tanh(in[j] / exp((k + 1) * 0.55) / 0.12) * (size - i));
-                        auto c = qd2u(ahsv2argb({1, h, s, vm * (k + 1)}));
+                        auto c = qd2u(hsva2rgba({h, s, vm * (k + 1), 1}));
                         while (w--) out[i++] = c;
                     }
                     while (i < size)
@@ -469,17 +469,17 @@ int ui::main() {
                 for (uint8_t strip = 0; strip < 4; strip++) {
                     comm.update(strip, frameData[strip], [
                         brightness = strip < 2 ? config.brightnessV.load() : config.brightnessA.load(),
-                        gamma = config.gamma.load(), ts = k2argb(config.temperature),
+                        gamma = config.gamma.load(), ts = k2rgba((float)config.temperature.load()),
                         mb = strip < 2 ? pow(config.minLevel, 1 / config.gamma) : 0
                     ](uint32_t color) {
-                        auto [a, r, g, b] = u2qd(color);
+                        auto cf = u2qd(color);
                         // Naively applying round((x * brightness / 255) ^ gamma * 255) for each component
                         // can multiply relative differences due to rounding errors, e.g. 16, 17, 16 (barely
                         // greenish dark gray) at gamma 2.0 and brightness = 70% will become 0, 1, 0 (obvious
                         // dark green). To avoid this, round the differences instead.
-                        g = pow((g * brightness * (1 - mb) + mb) * ts._3, gamma);
-                        r = pow((r * brightness * (1 - mb) + mb) * ts._2, gamma) - g;
-                        b = pow((b * brightness * (1 - mb) + mb) * ts._4, gamma) - g;
+                        float g = (float)pow((cf.g * brightness * (1 - mb) + mb) * ts.g, gamma);
+                        float r = (float)pow((cf.r * brightness * (1 - mb) + mb) * ts.r, gamma) - g;
+                        float b = (float)pow((cf.b * brightness * (1 - mb) + mb) * ts.b, gamma) - g;
                         return LED((int)(round(r * LED::scale) + round(g * LED::scale)),
                                    (int)(round(g * LED::scale)),
                                    (int)(round(b * LED::scale) + round(g * LED::scale)));

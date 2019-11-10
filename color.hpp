@@ -4,58 +4,59 @@
 #include <math.h>
 #include <utility>
 
-struct DOUBLEX4 {
-    double _1, _2, _3, _4;
+struct FLOATX4 {
+    union { float r, h, x, _1; };
+    union { float g, s, y, _2; };
+    union { float b, v, z, _3; };
+    union { float a,    w, _4; };
 };
 
-static DOUBLEX4 u2qd(uint32_t q) {
-    return {(uint8_t)(q >> 24) / 255., (uint8_t)(q >> 16) / 255., (uint8_t)(q >> 8) / 255., (uint8_t)q / 255.};
+static FLOATX4 u2qd(uint32_t q) {
+    return {(uint8_t)(q >> 16) / 255.f, (uint8_t)(q >> 8) / 255.f, (uint8_t)q / 255.f, (uint8_t)(q >> 24) / 255.f};
 }
 
-static uint32_t qd2u(DOUBLEX4 q) {
-    return (uint8_t)round(q._1 * 255) << 24
-         | (uint8_t)round(q._2 * 255) << 16
-         | (uint8_t)round(q._3 * 255) << 8
-         | (uint8_t)round(q._4 * 255);
+static uint32_t qd2u(FLOATX4 q) {
+    return (uint8_t)round(q.a * 255) << 24
+         | (uint8_t)round(q.r * 255) << 16
+         | (uint8_t)round(q.g * 255) << 8
+         | (uint8_t)round(q.b * 255);
 }
 
-static DOUBLEX4 argb2ahsv(DOUBLEX4 x) {
-    auto [a, r, g, b] = x;
-    double min = r < b ? r < g ? r : g : b < g ? b : g;
-    double max = r > b ? r > g ? r : g : b > g ? b : g;
-    double h = 0, s = 0, v = max >= 0.00001 ? max : 0;
+static FLOATX4 rgba2hsva(FLOATX4 x) {
+    float min = x.r < x.b ? x.r < x.g ? x.r : x.g : x.b < x.g ? x.b : x.g;
+    float max = x.r > x.b ? x.r > x.g ? x.r : x.g : x.b > x.g ? x.b : x.g;
+    float h = 0, s = 0, v = max >= 0.00001 ? max : 0;
     if (max - min >= 0.00001) {
         s = 1 - min / max;
-        h = r == max ? 0.0 + (g - b) / (max - min)
-          : g == max ? 2.0 + (b - r) / (max - min)
-          : /* c.B */  4.0 + (r - g) / (max - min);
+        h = x.r == max ? 0.f + (x.g - x.b) / (max - min)
+          : x.g == max ? 2.f + (x.b - x.r) / (max - min)
+          : /* x.b */    4.f + (x.r - x.g) / (max - min);
         h = h / 6 + (h < 0);
     }
-    return {a, h, s, v};
+    return {h, s, v, x.a};
 }
 
-static DOUBLEX4 ahsv2argb(DOUBLEX4 x) {
-    auto [a, h, s, v] = x;
-    int i = (int)(h * 6);
-    double f = h * 6 - i;
-    double m = v * (1.0 - s);
-    double p = v * (1.0 - s * f);
-    double q = v * (1.0 - s * (1.0 - f));
-    return i == 0 ? DOUBLEX4{a, v, q, m}
-         : i == 1 ? DOUBLEX4{a, p, v, m}
-         : i == 2 ? DOUBLEX4{a, m, v, q}
-         : i == 3 ? DOUBLEX4{a, m, p, v}
-         : i == 4 ? DOUBLEX4{a, q, m, v}
-         : /* 6 */  DOUBLEX4{a, v, m, p};
+static FLOATX4 hsva2rgba(FLOATX4 x) {
+    int i = (int)(x.h * 6);
+    float f = x.h * 6 - i;
+    float m = x.v * (1.f - x.s);
+    float p = x.v * (1.f - x.s * f);
+    float q = x.v * (1.f - x.s * (1.f - f));
+    return i == 0 ? FLOATX4{x.v, q, m, x.a}
+         : i == 1 ? FLOATX4{p, x.v, m, x.a}
+         : i == 2 ? FLOATX4{m, x.v, q, x.a}
+         : i == 3 ? FLOATX4{m, p, x.v, x.a}
+         : i == 4 ? FLOATX4{q, m, x.v, x.a}
+         : /* 6 */  FLOATX4{x.v, m, p, x.a};
 }
 
-static DOUBLEX4 k2argb(double t) {
+static FLOATX4 k2rgba(float t) {
     t /= 100; // http://www.zombieprototypes.com/?p=210
-#define LC(a, b, c, d) (a) + (b) * (t - d) + (c) * log(t - d)
-    auto r = std::max(0., std::min(1., t < 66 ? 1. : LC(1.3803015908551253, 0.0004478684462124118, -0.15785750232675008, 55)));
-    auto g = std::max(0., std::min(1., t < 66 ? LC(-0.6088425710866344, -0.001748900018414868, 0.4097731842899564, 2)
-                                              : LC(1.2762722061615583, 0.0003115080994769546, -0.11013841706194392, 50)));
-    auto b = std::max(0., std::min(1., t < 66 ? LC(-0.9990954974165059, 0.0032447435545127036, 0.453646839257496, 10) : 1));
+#define LC(a, b, c, d) (a) + (b) * (t - d) + (c) * logf(t - d)
+    auto r = std::max(0.f, std::min(1.f, t < 66 ? 1.f : LC(1.38030159086f, 0.0004478684462f, -0.15785750233f, 55)));
+    auto g = std::max(0.f, std::min(1.f, t < 66 ? LC(-0.6088425711f, -0.001748900018f,  0.4097731843f,   2)
+                                                : LC( 1.2762722062f, 0.0003115080995f, -0.11013841706f, 50)));
+    auto b = std::max(0.f, std::min(1.f, t < 66 ? LC(-0.9990954974f, 0.0032447435545f,  0.453646839f,   10) : 1.f));
 #undef LC
-    return {1, r, g, b};
+    return {r, g, b, 1};
 }
