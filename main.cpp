@@ -415,13 +415,11 @@ int ui::main() {
                 return;
             averageColor = qd2u({sum.r / w / h, sum.g / w / h, sum.b / w / h, sum.a});
             updateLocked([&] {
-#define W_PX(out, y, x) do { *out++ = in[(y) * w + (x)]; } while (0)
                 auto a = frameData[0], b = frameData[1];
-                for (auto x = w; x--; ) W_PX(a, h - 1, x); // bottom right -> bottom left
-                for (auto y = h; y--; ) W_PX(a, y, 0);     // bottom left -> top left
-                for (auto y = h; y--; ) W_PX(b, y, w - 1); // bottom right -> top right
-                for (auto x = w; x--; ) W_PX(b, 0, x);     // top right -> top left
-#undef W_PX
+                for (auto x = w; x--; ) *a++ = in[(h - 1) * w + x]; // bottom right -> bottom left
+                for (auto y = h; y--; ) *a++ = in[y * w];           // bottom left -> top left
+                for (auto y = h; y--; ) *b++ = in[y * w + w - 1];   // bottom right -> top right
+                for (auto x = w; x--; ) *b++ = in[x];               // top right -> top left
             });
         }
     });
