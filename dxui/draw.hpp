@@ -17,8 +17,8 @@
 //     ui::vertex vs[] = {QUAD(...)};
 //
 #define QUAD(L, T, R, B, Z, tL, tT, tR, tB) \
-    {{L, B, Z}, {}, {tL, tB}, 1.f}, {{L, T, Z}, {}, {tL, tT}, 1.f}, {{R, B, Z}, {}, {tR, tB}, 1.f}, \
-    {{R, B, Z}, {}, {tR, tB}, 1.f}, {{L, T, Z}, {}, {tL, tT}, 1.f}, {{R, T, Z}, {}, {tR, tT}, 1.f}
+    {{L, B, Z}, {}, {tL, tB}}, {{L, T, Z}, {}, {tL, tT}}, {{R, B, Z}, {}, {tR, tB}}, \
+    {{R, B, Z}, {}, {tR, tB}}, {{L, T, Z}, {}, {tL, tT}}, {{R, T, Z}, {}, {tR, tT}}
 
 // Same as `QUAD`, but the texture rectangle is rotated 90 degrees clockwise.
 //
@@ -27,8 +27,8 @@
 //       a 270 degree rotation.
 //
 #define QUADR(L, T, R, B, Z, tL, tT, tR, tB) \
-    {{L, B, Z}, {}, {tR, tB}, 1.f}, {{L, T, Z}, {}, {tL, tB}, 1.f}, {{R, B, Z}, {}, {tR, tT}, 1.f}, \
-    {{R, B, Z}, {}, {tR, tT}, 1.f}, {{L, T, Z}, {}, {tL, tB}, 1.f}, {{R, T, Z}, {}, {tL, tT}, 1.f}
+    {{L, B, Z}, {}, {tR, tB}}, {{L, T, Z}, {}, {tL, tB}}, {{R, B, Z}, {}, {tR, tT}}, \
+    {{R, B, Z}, {}, {tR, tT}}, {{L, T, Z}, {}, {tL, tB}}, {{R, T, Z}, {}, {tL, tT}}
 
 // Same as `QUAD`, but all coordinates are in pixels. These are suitable
 // for passing to `ui::dxcontext::draw`.
@@ -92,7 +92,6 @@ namespace ui {
         DirectX::XMFLOAT3 pos;
         DirectX::XMFLOAT4 clr;
         DirectX::XMFLOAT2 tex;
-        float             blw;
     };
 
     struct dxcontext {

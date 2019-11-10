@@ -30,7 +30,6 @@ ui::dxcontext::dxcontext() {
         {"POSITION",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,       0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"BLENDWEIGHT", 0, DXGI_FORMAT_R32_FLOAT,          0, 36, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
     vertexId = COMe(ID3D11VertexShader, device->CreateVertexShader, g_id_vertex, ARRAYSIZE(g_id_vertex), nullptr);
     pixelId = COMe(ID3D11PixelShader, device->CreatePixelShader, g_id_pixel, ARRAYSIZE(g_id_pixel), nullptr);
@@ -79,12 +78,16 @@ ui::dxcontext::dxcontext() {
     context->RSSetState(rState);
 }
 
+static winapi::com_ptr<ID3D11Texture2D> nullTexture(ui::dxcontext& ctx) {
+    return ctx.textureFromRaw({0, 0, 0, 0}, 1);
+}
+
 void ui::dxcontext::clear(ID3D11Texture2D* target, RECT area, uint32_t color) {
     ui::vertex quad[] = {QUAD(-1, +1, +1, -1, 0, 0, 0, 0, 0)};
-    for (auto& vertex : quad) {
+    for (auto& vertex : quad)
         vertex.clr = ARGB2CLR(color);
-        vertex.blw = 0.f;
-    }
+    auto tx = cached<ID3D11Texture2D, nullTexture>();
+    auto sr = COMe(ID3D11ShaderResourceView, device->CreateShaderResourceView, tx, nullptr);
     auto rt = COMe(ID3D11RenderTargetView, device->CreateRenderTargetView, target, nullptr);
     auto vb = buffer(util::span<ui::vertex>(quad).reinterpret<const uint8_t>(), D3D11_BIND_VERTEX_BUFFER);
     UINT stride = sizeof(vertex);
@@ -92,12 +95,13 @@ void ui::dxcontext::clear(ID3D11Texture2D* target, RECT area, uint32_t color) {
     D3D11_TEXTURE2D_DESC targetDesc;
     target->GetDesc(&targetDesc);
     D3D11_VIEWPORT vp = {0, 0, (FLOAT)targetDesc.Width, (FLOAT)targetDesc.Height, 0, 1};
+    context->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
     context->RSSetViewports(1, &vp);
     context->RSSetScissorRects(1, &area);
     context->PSSetShader(pixelId, nullptr, 0);
+    context->PSSetShaderResources(0, 1, &sr);
     context->OMSetBlendState(blendClear, nullptr, 0xFFFFFFFFU);
     context->OMSetRenderTargets(1, &rt, nullptr);
-    context->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
     context->Draw(6, 0);
 }
 
@@ -123,13 +127,13 @@ void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util:
     UINT stride = sizeof(vertex);
     UINT offset = 0;
     D3D11_VIEWPORT vp = {0, 0, (FLOAT)targetDesc.Width, (FLOAT)targetDesc.Height, 0, 1};
+    context->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
     context->RSSetViewports(1, &vp);
     context->RSSetScissorRects(1, &cull);
     context->PSSetShader(shader ? shader : pixelId.get(), nullptr, 0);
+    context->PSSetShaderResources(0, 1, &sr);
     context->OMSetBlendState(blendOver, nullptr, 0xFFFFFFFFU);
     context->OMSetRenderTargets(1, &rt, nullptr);
-    context->PSSetShaderResources(0, 1, &sr);
-    context->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
     context->Draw((UINT)vertices.size(), 0);
 }
 
