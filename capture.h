@@ -3,6 +3,7 @@
 #include <memory>
 #include <stdint.h>
 
+#include "color.hpp"
 #include "dxui/span.hpp"
 
 struct IAudioCapturer {
@@ -20,7 +21,7 @@ struct IVideoCapturer {
     // Capture a new frame, blocking for up to the specified number of milliseconds.
     // Return the frame as a span of width * height ARGB pixels. If nothing has changed
     // since the last call, return an empty span instead.
-    virtual util::span<const uint32_t> next(uint32_t timeout = 500) = 0;
+    virtual util::span<const FLOATX4> next(uint32_t timeout = 500) = 0;
 };
 
 // Create a new video capturer that takes an image of the screen, downscales it

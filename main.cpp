@@ -365,7 +365,7 @@ int ui::main() {
 
     std::atomic<uint32_t> averageColor = config.color;
     bool frameDirty = false;
-    UINT frameData[4][AMBILIGHT_CHUNKS_PER_STRIP * AMBILIGHT_SERIAL_CHUNK] = {};
+    FLOATX4 frameData[4][AMBILIGHT_CHUNKS_PER_STRIP * AMBILIGHT_SERIAL_CHUNK] = {};
 
     auto updateLocked = [&](auto&& unsafePart) {
         std::lock_guard<std::mutex> lock(mut);
@@ -407,17 +407,13 @@ int ui::main() {
         size_t h = config.height;
         auto cap = captureScreen(0, w, h);
         while (!terminate) if (auto in = cap->next()) {
-            int32_t averageComponents[4] = {0, 0, 0, 0};
-            for (const auto& color : in.reinterpret<const BYTE[4]>())
-                for (int c = 0; c < 4; c++)
-                    averageComponents[c] += color[c];
+            FLOATX4 sum = {0, 0, 0, 1.f};
+            for (const auto& color : in)
+                sum.r += color.r, sum.g += color.g, sum.b += color.b;
             auto lk = std::unique_lock<std::timed_mutex>(videoMutex, std::chrono::milliseconds(30));
             if (!lk)
                 return;
-            averageColor = 0xFF000000u
-                        | (UINT)(averageComponents[2] / w / h) << 16
-                        | (UINT)(averageComponents[1] / w / h) << 8
-                        | (UINT)(averageComponents[0] / w / h);
+            averageColor = qd2u({sum.r / w / h, sum.g / w / h, sum.b / w / h, sum.a});
             updateLocked([&] {
 #define W_PX(out, y, x) do { *out++ = in[(y) * w + (x)]; } while (0)
                 auto a = frameData[0], b = frameData[1];
@@ -447,11 +443,11 @@ int ui::main() {
                     for (size_t k = in.size() / 2; k--; j++) {
                         // Yay, hardcoded coefficients! TODO figure out a better mapping.
                         auto w = (size_t)(tanh(in[j] / exp((k + 1) * 0.55) / 0.12) * (size - i));
-                        auto c = qd2u(hsva2rgba({h, s, vm * (k + 1), 1}));
+                        auto c = hsva2rgba({h, s, vm * (k + 1), 1});
                         while (w--) out[i++] = c;
                     }
                     while (i < size)
-                        out[i++] = 0xFF000000u;
+                        out[i++] = {0, 0, 0, 1};
                 }
             });
         }
@@ -471,15 +467,14 @@ int ui::main() {
                         brightness = strip < 2 ? config.brightnessV.load() : config.brightnessA.load(),
                         gamma = config.gamma.load(), ts = k2rgba((float)config.temperature.load()),
                         mb = strip < 2 ? pow(config.minLevel, 1 / config.gamma) : 0
-                    ](uint32_t color) {
-                        auto cf = u2qd(color);
+                    ](FLOATX4 color) {
                         // Naively applying round((x * brightness / 255) ^ gamma * 255) for each component
                         // can multiply relative differences due to rounding errors, e.g. 16, 17, 16 (barely
                         // greenish dark gray) at gamma 2.0 and brightness = 70% will become 0, 1, 0 (obvious
                         // dark green). To avoid this, round the differences instead.
-                        float g = (float)pow((cf.g * brightness * (1 - mb) + mb) * ts.g, gamma);
-                        float r = (float)pow((cf.r * brightness * (1 - mb) + mb) * ts.r, gamma) - g;
-                        float b = (float)pow((cf.b * brightness * (1 - mb) + mb) * ts.b, gamma) - g;
+                        float g = (float)pow((color.g * brightness * (1 - mb) + mb) * ts.g, gamma);
+                        float r = (float)pow((color.r * brightness * (1 - mb) + mb) * ts.r, gamma) - g;
+                        float b = (float)pow((color.b * brightness * (1 - mb) + mb) * ts.b, gamma) - g;
                         return LED((int)(round(r * LED::scale) + round(g * LED::scale)),
                                    (int)(round(g * LED::scale)),
                                    (int)(round(b * LED::scale) + round(g * LED::scale)));
@@ -508,16 +503,16 @@ int ui::main() {
         if (!audioLock) audioLock.lock();
         updateLocked([&] {
             for (auto& strip : frameData)
-                std::fill(std::begin(strip), std::end(strip), 0xFF000000u);
+                std::fill(std::begin(strip), std::end(strip), FLOATX4{0, 0, 0, 1});
             size_t w = config.width, h = config.height, m = config.musicLeds;
             // The pattern depicted in screensetup.png.
-            frameData[0][0] = frameData[1][0] = 0xFF00FFFFu;
-            frameData[0][w] = frameData[0][w - 1] = 0xFFFFFF00u;
-            frameData[1][h] = frameData[1][h - 1] = 0xFFFF00FFu;
-            frameData[0][w + h - 1] = frameData[1][w + h - 1] = 0xFFFFFFFFu;
+            frameData[0][0]         = frameData[1][0]         = {0, 1, 1, 1};
+            frameData[0][w]         = frameData[0][w - 1]     = {1, 1, 0, 1};
+            frameData[1][h]         = frameData[1][h - 1]     = {1, 0, 1, 1};
+            frameData[0][w + h - 1] = frameData[1][w + h - 1] = {1, 1, 1, 1};
             // TODO maybe render 2 dots on each instead?
-            std::fill(frameData[2], frameData[2] + m / 2, 0xFFFFFF00u);
-            std::fill(frameData[3], frameData[3] + m / 2, 0xFF00FFFFu);
+            std::fill(frameData[2], frameData[2] + m / 2, FLOATX4{1, 1, 0, 1});
+            std::fill(frameData[3], frameData[3] + m / 2, FLOATX4{0, 1, 1, 1});
         });
     };
 
@@ -525,10 +520,9 @@ int ui::main() {
         if (color & 0xFF000000u) {
             if (!videoLock) videoLock.lock();
             averageColor = color;
-            updateLocked([&] {
-                size_t s = config.width + config.height;
-                std::fill(frameData[0], frameData[0] + s, color);
-                std::fill(frameData[1], frameData[1] + s, color);
+            updateLocked([&frameData, cf = u2qd(color), s = config.width + config.height] {
+                std::fill(frameData[0], frameData[0] + s, cf);
+                std::fill(frameData[1], frameData[1] + s, cf);
             });
         } else if (videoLock) {
             videoLock.unlock();
@@ -542,8 +536,8 @@ int ui::main() {
             updateLocked([&] {
                 // There's no guarantee that the audio capturer will have anything on first
                 // iteration (might be nothing playing), so clear the test pattern explicitly.
-                std::fill(std::begin(frameData[2]), std::end(frameData[2]), 0xFF000000u);
-                std::fill(std::begin(frameData[3]), std::end(frameData[3]), 0xFF000000u);
+                std::fill(std::begin(frameData[2]), std::end(frameData[2]), FLOATX4{0, 0, 0, 1});
+                std::fill(std::begin(frameData[3]), std::end(frameData[3]), FLOATX4{0, 0, 0, 1});
             });
             audioLock.unlock();
         }

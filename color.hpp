@@ -52,11 +52,12 @@ static FLOATX4 hsva2rgba(FLOATX4 x) {
 
 static FLOATX4 k2rgba(float t) {
     t /= 100; // http://www.zombieprototypes.com/?p=210
+    auto clamp = [](float x) { return x < 0.f ? 0.f : x > 1.f ? 1.f : x; };
 #define LC(a, b, c, d) (a) + (b) * (t - d) + (c) * logf(t - d)
-    auto r = std::max(0.f, std::min(1.f, t < 66 ? 1.f : LC(1.38030159086f, 0.0004478684462f, -0.15785750233f, 55)));
-    auto g = std::max(0.f, std::min(1.f, t < 66 ? LC(-0.6088425711f, -0.001748900018f,  0.4097731843f,   2)
-                                                : LC( 1.2762722062f, 0.0003115080995f, -0.11013841706f, 50)));
-    auto b = std::max(0.f, std::min(1.f, t < 66 ? LC(-0.9990954974f, 0.0032447435545f,  0.453646839f,   10) : 1.f));
+    auto r = clamp(t < 66 ? 1.f : LC(1.38030159086f, 0.0004478684462f, -0.15785750233f, 55));
+    auto g = clamp(t < 66 ? LC(-0.6088425711f, -0.001748900018f,  0.4097731843f,   2)
+                          : LC( 1.2762722062f, 0.0003115080995f, -0.11013841706f, 50));
+    auto b = clamp(t < 66 ? LC(-0.9990954974f, 0.0032447435545f,  0.453646839f,   10) : 1.f);
 #undef LC
     return {r, g, b, 1};
 }

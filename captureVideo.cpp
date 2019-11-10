@@ -46,6 +46,7 @@ struct ScreenCapturer : IVideoCapturer {
 
         targetDesc.Width = w;
         targetDesc.Height = h;
+        targetDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
         targetDesc.MipLevels = 1;
         targetDesc.MiscFlags = 0;
         rescaled1 = COMe(ID3D11Texture2D, res.raw()->CreateTexture2D, &targetDesc, nullptr);
@@ -57,7 +58,7 @@ struct ScreenCapturer : IVideoCapturer {
         cpuReadTarget = COMe(ID3D11Texture2D, res.raw()->CreateTexture2D, &targetDesc, nullptr);
     }
 
-    util::span<const UINT> next(UINT timeout) override {
+    util::span<const FLOATX4> next(uint32_t timeout) override {
         bool needUpdate = !needRelease;
         if (needRelease) {
             needRelease = false;
@@ -123,7 +124,7 @@ struct ScreenCapturer : IVideoCapturer {
         winapi::throwOnFalse(readSurface->Map(&mapped, DXGI_MAP_READ));
         DEFER { readSurface->Unmap(); };
         for (UINT y = 0; y < rescaledDesc.Height; y++)
-            memcpy(&collected[y * rescaledDesc.Width], &mapped.pBits[y * mapped.Pitch], rescaledDesc.Width * sizeof(UINT));
+            memcpy(&collected[y * rescaledDesc.Width], &mapped.pBits[y * mapped.Pitch], rescaledDesc.Width * sizeof(FLOATX4));
         return collected;
     }
 
@@ -149,7 +150,7 @@ private:
     winapi::com_ptr<ID3D11Texture2D> cpuReadTarget;
     winapi::com_ptr<IDXGIOutputDuplication> display;
     std::vector<BYTE> metadata;
-    std::vector<UINT> collected;
+    std::vector<FLOATX4> collected;
     bool mirror = false;
     bool rotate = false;
     bool needRelease = false;

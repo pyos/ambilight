@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arduino/arduino.h"
+#include "color.hpp"
 #include "dxui/span.hpp"
 #include "dxui/winapi.hpp"
 
@@ -31,8 +32,8 @@ struct serial {
         winapi::throwOnFalse(PurgeComm(handle.get(), PURGE_RXCLEAR | PURGE_TXCLEAR));
     }
 
-    template <typename F /* LED(uint32_t) */>
-    void update(uint8_t strip, util::span<const UINT> data, F&& transform) {
+    template <typename F /* LED(FLOATX4) */>
+    void update(uint8_t strip, util::span<const FLOATX4> data, F&& transform) {
         for (size_t i = 0; i < data.size(); i++) {
             LED n = transform(data[i]);
             size_t chunk = i / AMBILIGHT_SERIAL_CHUNK;
