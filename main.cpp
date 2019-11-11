@@ -362,10 +362,9 @@ int ui::main() {
     // NOTE: deadlock-avoiding resource hierarchy: `videoLock`, then `audioLock`, then `mut`.
     std::mutex mut;
     std::condition_variable frameEv;
-
-    std::atomic<uint32_t> averageColor = config.color;
-    bool frameDirty = false;
     FLOATX4 frameData[4][AMBILIGHT_CHUNKS_PER_STRIP * AMBILIGHT_SERIAL_CHUNK] = {};
+    FLOATX4 averageColor = u2qd(config.color);
+    bool frameDirty = false;
 
     auto updateLocked = [&](auto&& unsafePart) {
         std::lock_guard<std::mutex> lock(mut);
@@ -407,14 +406,14 @@ int ui::main() {
         size_t h = config.height;
         auto cap = captureScreen(0, w, h);
         while (!terminate) if (auto in = cap->next()) {
-            FLOATX4 sum = {0, 0, 0, 1.f};
+            FLOATX4 sum = {0, 0, 0, 0};
             for (const auto& color : in)
-                sum.r += color.r, sum.g += color.g, sum.b += color.b;
+                sum = sum.apply([](float x, float y) { return x + y; }, color);
             auto lk = std::unique_lock<std::timed_mutex>(videoMutex, std::chrono::milliseconds(30));
             if (!lk)
                 return;
-            averageColor = qd2u({sum.r / w / h, sum.g / w / h, sum.b / w / h, sum.a});
             updateLocked([&] {
+                averageColor = sum.apply([&](float x) { return x / w / h; });
                 auto a = frameData[0], b = frameData[1];
                 for (auto x = w; x--; ) *a++ = in[(h - 1) * w + x]; // bottom right -> bottom left
                 for (auto y = h; y--; ) *a++ = in[y * w];           // bottom left -> top left
@@ -428,24 +427,24 @@ int ui::main() {
         { std::unique_lock<std::timed_mutex> lk(audioMutex); };
         auto cap = captureDefaultAudioOutput();
         while (!terminate) if (auto in = cap->next()) {
-            auto ac = rgba2hsva(u2qd(averageColor));
             auto lk = std::unique_lock<std::timed_mutex>(audioMutex, std::chrono::milliseconds(30));
             if (!lk)
                 return;
-            // 1. Need a lower bound on value so that the strip is always visible at all. 
-            // 2. Fade to gray at low value to avoid abrupt color changes on fade to black.
-            updateLocked([&, h = ac.h, s = ac.s * std::min(ac.v * 2, 1.f), vm = std::max(ac.v * 2, 1.f) / in.size()] {
-                size_t j = 0, size = config.musicLeds / 2;
+            updateLocked([&, half = in.size() / 2, size = config.musicLeds / 2] {
+                auto ac = rgba2hsva(averageColor);
+                ac.s = std::min(ac.v, .5f) * 2 * ac.s; // Avoid abrupt color changes on fade to black.
+                ac.v = std::max(ac.v, .5f); // Ensure the strip is always visible at all.
+                size_t j = 0;
                 for (auto* out : {frameData[2], frameData[3]}) {
                     size_t i = 0;
-                    for (size_t k = in.size() / 2; k--; j++) {
+                    for (size_t k = half; k--;) {
+                        auto c = hsva2rgba({ac.h, ac.s, ac.v * (k + 1) / half, ac.v * (k + 1) / half});
                         // Yay, hardcoded coefficients! TODO figure out a better mapping.
-                        auto w = (size_t)(tanh(in[j] / exp((k + 1) * 0.55) / 0.12) * (size - i));
-                        auto c = hsva2rgba({h, s, vm * (k + 1), 1});
+                        auto w = (size_t)(tanh(in[j++] / exp((k + 1) * 0.55) / 0.12) * (size - i));
                         while (w--) out[i++] = c;
                     }
                     while (i < size)
-                        out[i++] = {0, 0, 0, 1};
+                        out[i++] = {0, 0, 0, 0};
                 }
             });
         }
@@ -460,22 +459,20 @@ int ui::main() {
             // Ping the arduino at least once per ~2s so that it knows the app is still running.
             if (frameEv.wait_for(lock, std::chrono::seconds(2), [&]{ return frameDirty; })) {
                 frameDirty = false;
+                auto gamma = config.gamma.load();
+                auto white = k2rgba((float)config.temperature.load());
                 for (uint8_t strip = 0; strip < 4; strip++) {
-                    comm.update(strip, frameData[strip], [
-                        brightness = strip < 2 ? config.brightnessV.load() : config.brightnessA.load(),
-                        gamma = config.gamma.load(), ts = k2rgba((float)config.temperature.load()),
-                        mb = strip < 2 ? pow(config.minLevel, 1 / config.gamma) : 0
-                    ](FLOATX4 color) {
-                        // Naively applying round((x * brightness / 255) ^ gamma * 255) for each component
-                        // can multiply relative differences due to rounding errors, e.g. 16, 17, 16 (barely
-                        // greenish dark gray) at gamma 2.0 and brightness = 70% will become 0, 1, 0 (obvious
-                        // dark green). To avoid this, round the differences instead.
-                        float g = (float)pow((color.g * brightness * (1 - mb) + mb) * ts.g, gamma);
-                        float r = (float)pow((color.r * brightness * (1 - mb) + mb) * ts.r, gamma) - g;
-                        float b = (float)pow((color.b * brightness * (1 - mb) + mb) * ts.b, gamma) - g;
-                        return LED((int)(round(r * LED::scale) + round(g * LED::scale)),
-                                   (int)(round(g * LED::scale)),
-                                   (int)(round(b * LED::scale) + round(g * LED::scale)));
+                    auto lower = strip < 2 ? pow(config.minLevel, 1 / config.gamma) : 0;
+                    auto upper = strip < 2 ? config.brightnessV.load() : config.brightnessA.load();
+                    comm.update(strip, frameData[strip], [&](FLOATX4 color) {
+                        color = color.apply([&](float x, float y) {
+                            return (float)pow((x * upper * (1 - lower) + lower) * y, gamma); }, white);
+                        // Rounding each component separately can magnify relative differences due to errors,
+                        // e.g. 16, 17, 16 (barely greenish dark gray) at gamma 2.0, brightness 70%, and limit
+                        // 255 will become 0, 1, 0 (obvious dark green), so round the differences instead.
+                        return LED((int)(round((color.r - color.g) * LED::scale) + round(color.g * LED::scale)),
+                                   (int)(round(color.g * LED::scale)),
+                                   (int)(round((color.b - color.g) * LED::scale) + round(color.g * LED::scale)));
                     });
                 }
             }
@@ -514,13 +511,13 @@ int ui::main() {
         });
     };
 
-    auto setVideoPattern = [&](uint32_t color) {
-        if (color & 0xFF000000u) {
+    auto setVideoPattern = [&](FLOATX4 color) {
+        if (color.a) {
             if (!videoLock) videoLock.lock();
-            averageColor = color;
-            updateLocked([&frameData, cf = u2qd(color), s = config.width + config.height] {
-                std::fill(frameData[0], frameData[0] + s, cf);
-                std::fill(frameData[1], frameData[1] + s, cf);
+            updateLocked([&, s = config.width + config.height] {
+                averageColor = color;
+                std::fill(frameData[0], frameData[0] + s, color);
+                std::fill(frameData[1], frameData[1] + s, color);
             });
         } else if (videoLock) {
             videoLock.unlock();
@@ -529,7 +526,7 @@ int ui::main() {
 
     auto setBothPatterns = [&] {
         mainWindow.setNotificationIcon(ui::loadSmallIcon(ui::fromBundled(IDI_APP)), L"Ambilight");
-        setVideoPattern(config.color);
+        setVideoPattern(u2qd(config.color));
         if (audioLock) {
             updateLocked([&] {
                 // There's no guarantee that the audio capturer will have anything on first
@@ -576,7 +573,7 @@ int ui::main() {
         // Ping the serial thread.
         updateLocked([&]{ });
     });
-    tooltipConfig.onColor.addForever([&](uint32_t c) { setVideoPattern(config.color = c); });
+    tooltipConfig.onColor.addForever([&](uint32_t c) { setVideoPattern(u2qd(config.color = c)); });
 
     winapi::holder<HMENU, DestroyMenu> menu{CreatePopupMenu()};
     winapi::throwOnFalse(AppendMenu(menu.get(), MF_STRING, 1, L"Reconfigure..."));

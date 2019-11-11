@@ -9,6 +9,11 @@ struct FLOATX4 {
     union { float g, s, y, _2; };
     union { float b, v, z, _3; };
     union { float a,    w, _4; };
+
+    template <typename... Ts, typename F>
+    FLOATX4 apply(F&& f, Ts&&... other) const {
+        return {f(r, other.r...), f(g, other.g...), f(b, other.b...), f(a, other.a...)};
+    }
 };
 
 static FLOATX4 u2qd(uint32_t q) {
