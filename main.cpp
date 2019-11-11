@@ -466,13 +466,13 @@ int ui::main() {
                     auto upper = strip < 2 ? config.brightnessV.load() : config.brightnessA.load();
                     comm.update(strip, frameData[strip], [&](FLOATX4 color) {
                         color = color.apply([&](float x, float y) {
-                            return (float)pow((x * upper * (1 - lower) + lower) * y, gamma); }, white);
+                            return LED::scale * (float)pow((x * upper * (1 - lower) + lower) * y, gamma); }, white);
                         // Rounding each component separately can magnify relative differences due to errors,
                         // e.g. 16, 17, 16 (barely greenish dark gray) at gamma 2.0, brightness 70%, and limit
-                        // 255 will become 0, 1, 0 (obvious dark green), so round the differences instead.
-                        return LED((int)(round((color.r - color.g) * LED::scale) + round(color.g * LED::scale)),
-                                   (int)(round(color.g * LED::scale)),
-                                   (int)(round((color.b - color.g) * LED::scale) + round(color.g * LED::scale)));
+                        // 255 will become 0, 1, 0 (obvious dark green), so round Cr/Cg/Cb instead.
+                        auto y = 0.299f * color.r + 0.587f * color.g + 0.114f * color.b;
+                        color = color.apply([&](float x) { return round(x - y) + round(y); });
+                        return LED((int)color.r, (int)color.g, (int)color.b);
                     });
                 }
             }
