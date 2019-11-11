@@ -114,23 +114,23 @@ struct SK9822Pair {
   {
     // assert(digital_pin_to_port[pinA] == digital_pin_to_port[pinB]);
     // assert(digital_pin_to_port[pinA] == digital_pin_to_port[clk]);
+    port->DIRSET = maskA | maskB | maskC;
+    port->OUTCLR = maskA | maskB | maskC;
   }
 
   void show(const uint8_t* A, const uint8_t* B, size_t n) {
+    const uint8_t maskABC = maskA | maskB | maskC;
     // Start frame: 32 zeros
     // Data: 111xxxxxbbbbbbbbggggggggrrrrrrrr
     // End frame: max(32, n/2) zeros
-    const uint8_t maskABC = maskA | maskB | maskC;
-    port->OUTCLR = maskA | maskB | maskC;
-    for (int i = 0; i < 32; i++) {
+    for (uint8_t i = 0; i < 32; i++) {
       port->OUTSET = maskC;
       port->OUTCLR = maskC;
     }
     for (size_t m = n; m--;) {
       uint8_t a = *A++, b = *B++;
-      for (int i = 0; i < 8; i++) {
+      for (uint8_t i = 0; i < 8; i++) {
         uint8_t z = 0;
-        // XXX not sure if avr-gcc is smart enough to make this lsl+brcs+or
         if (a & 0x80) z |= maskA; a <<= 1;
         if (b & 0x80) z |= maskB; b <<= 1;
         port->OUTSET = z;
