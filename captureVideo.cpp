@@ -112,8 +112,7 @@ struct ScreenCapturer : IVideoCapturer {
         };
         ui::vertex vs2[] = {QUADP(0, 0, dst.right, dst.bottom, 0, 0, 0, dst.right, dst.bottom)};
         ui::vertex vs3[] = {QUADP(0, 0, dst.right, dst.bottom, 0, 0, 0, dst.right, dst.bottom)};
-        for (auto& w : vs2) w.clr = {1, 0, 0, 0};
-        for (auto& w : vs3) w.clr = {0, 1, 0, 0};
+        vs2[0].clr.w = vs2[2].clr.w = vs2[3].clr.w = vs3[2].clr.w = vs3[3].clr.w = vs3[5].clr.w = 1;
         res.regenerateMipMaps(complete);
         res.draw(rescaled1, complete, {&vs[6 * (rotate * 2 + mirror)], 6}, dst);
         res.draw(rescaled2, rescaled1, vs2, dst, blur);

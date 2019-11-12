@@ -40,7 +40,7 @@ float4 blur(PS_INPUT input) : SV_Target {
     const float weight[] = {0.15186256685575583, 0.12458323113065647, 0.08723135590047126, 0.05212966006304008, 0.026588224962816442};
     const float w0 = 0.07978845608028654;
 
-    float2 duv = ddx(input.Tex) * input.Clr.x + ddy(input.Tex) * input.Clr.y;
+    float2 duv = {ddx(input.Clr.a), ddy(input.Clr.a)};
     float4 color = tx.Sample(samLinear, input.Tex) * w0;
     for (int i = 0; i < 5; i++)
         color += (tx.Sample(samLinear, input.Tex + duv * offset[i]) +
