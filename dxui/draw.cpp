@@ -27,9 +27,9 @@ ui::dxcontext::dxcontext() {
     winapi::throwOnFalse(hr);
 
     D3D11_INPUT_ELEMENT_DESC layout[] = {
-        {"POSITION",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,       0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"POSITION",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, offsetof(vertex, pos), D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(vertex, clr), D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(vertex, tex), D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
     vertexId = COMe(ID3D11VertexShader, device->CreateVertexShader, g_id_vertex, ARRAYSIZE(g_id_vertex), nullptr);
     pixelId = COMe(ID3D11PixelShader, device->CreatePixelShader, g_id_pixel, ARRAYSIZE(g_id_pixel), nullptr);
@@ -131,9 +131,9 @@ void ui::dxcontext::draw(ID3D11Texture2D* target, ID3D11Texture2D* source, util:
     context->RSSetViewports(1, &vp);
     context->RSSetScissorRects(1, &cull);
     context->PSSetShader(shader ? shader : pixelId.get(), nullptr, 0);
-    context->PSSetShaderResources(0, 1, &sr);
     context->OMSetBlendState(blendOver, nullptr, 0xFFFFFFFFU);
     context->OMSetRenderTargets(1, &rt, nullptr);
+    context->PSSetShaderResources(0, 1, &sr);
     context->Draw((UINT)vertices.size(), 0);
 }
 
