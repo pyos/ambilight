@@ -47,12 +47,12 @@ static FLOATX4 hsva2rgba(FLOATX4 x) {
     float m = x.v * (1.f - x.s);
     float p = x.v * (1.f - x.s * f);
     float q = x.v * (1.f - x.s * (1.f - f));
-    return i == 0 ? FLOATX4{x.v, q, m, x.a}
-         : i == 1 ? FLOATX4{p, x.v, m, x.a}
-         : i == 2 ? FLOATX4{m, x.v, q, x.a}
-         : i == 3 ? FLOATX4{m, p, x.v, x.a}
-         : i == 4 ? FLOATX4{q, m, x.v, x.a}
-         : /* 6 */  FLOATX4{x.v, m, p, x.a};
+    return i % 6 == 0 ? FLOATX4{x.v, q, m, x.a}
+         : i % 6 == 1 ? FLOATX4{p, x.v, m, x.a}
+         : i % 6 == 2 ? FLOATX4{m, x.v, q, x.a}
+         : i % 6 == 3 ? FLOATX4{m, p, x.v, x.a}
+         : i % 6 == 4 ? FLOATX4{q, m, x.v, x.a}
+         : /* 5 */  FLOATX4{x.v, m, p, x.a};
 }
 
 static FLOATX4 k2rgba(float t) {
