@@ -473,7 +473,7 @@ int ui::main() {
     std::unique_ptr<ui::window> previewWindow;
     appui::sizing_config sizingConfig{config};
     appui::tooltip_config tooltipConfig{config};
-    std::atomic<int64_t> lastPreview{-1};
+    std::atomic<bool> previewing{false};
 
     std::atomic<bool> terminate{false};
     // These more granular mutexes (mutices?) synchronize writes to each pair of strips
@@ -497,7 +497,7 @@ int ui::main() {
     bool frameDirty = false;
 
     mainWindow.onMessage.addForever([&](uintptr_t) {
-        if (lastPreview != -1)
+        if (previewing)
             if (auto lk = std::unique_lock<std::mutex>(mut))
                 preview->setColors(frameData[0], frameData[1], frameData[2], frameData[3]);
     });
@@ -508,12 +508,8 @@ int ui::main() {
             frameDirty = true;
             frameEv.notify_all();
         }
-        if (auto was = lastPreview.load(); was != -1) {
-            auto now = std::chrono::steady_clock::now().time_since_epoch().count();
-            if (now - was > std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::milliseconds(16)).count())
-                if (lastPreview.compare_exchange_strong(was, now))
-                    mainWindow.post(0);
-        }
+        if (previewing)
+            mainWindow.post(0);
     };
 
     auto loopThread = [&](auto&& f) {
@@ -683,14 +679,14 @@ int ui::main() {
     auto openPreview = [&] {
         previewWindow.reset();
         preview = std::make_unique<appui::preview>(config.width.load(), config.height.load(), config.musicLeds.load());
-        lastPreview = std::chrono::steady_clock::now().time_since_epoch().count();
+        previewing = true;
         mainWindow.post(0);
         previewWindow = std::make_unique<ui::window>(800, 600, 100, 100);
         previewWindow->setRoot(preview.get());
         previewWindow->setBackground(0xcc111111u);
         previewWindow->setTitle(L"Ambilight Preview");
         previewWindow->setShadow(true);
-        previewWindow->onClose.addForever([&] { lastPreview = -1; });
+        previewWindow->onClose.addForever([&] { previewing = false; });
         previewWindow->show();
     };
 
