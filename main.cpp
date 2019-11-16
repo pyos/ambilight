@@ -333,14 +333,14 @@ namespace appui {
 
     private:
         POINT measureMinImpl() const override {
-            auto r = (float)std::min(w_, h_) / (10 - 2);
+            auto r = std::max(5.f, std::min(w_, h_) / (10.f - 2));
             return {(LONG)(w_ + r * 2), (LONG)(h_ + r * 3)};
         }
 
         POINT measureImpl(POINT fit) const override {
-            auto r = (float)std::min(fit.x, fit.y) / 10;
-            return {std::min(fit.x, (LONG)round(r*2 + (fit.y - r*3) * (w_ - 1) / (h_ - 1))),
-                    std::min(fit.y, (LONG)round(r*3 + (fit.x - r*2) * (h_ - 1) / (w_ - 1)))};
+            auto r = std::max(5.f, std::min(fit.x, fit.y) / 10.f);
+            return {std::min(fit.x, (LONG)round(r*2 + (fit.y - r*3) * w_ / h_)),
+                    std::min(fit.y, (LONG)round(r*3 + (fit.x - r*2) * h_ / w_))};
         }
 
         static DirectX::XMFLOAT4 c2v(FLOATX4 c) {
@@ -351,27 +351,30 @@ namespace appui {
         }
 
         //    ---       -2-   -+ ... +-   -+-
-        //     |      1- | -3- | ... | -+- | -+  Total N*9 vertices.
-        // r = |     / \ | / \ | ... | / \ | /
-        //     |    /   \|/   \| ... |/   \|/
-        //    ---  4-----0-----+-...-+-----+
+        //     |      1- | -3- | ... | -+- | -+  Total N*9 + 3 vertices.
+        // r = |     / \ | / \ | ... | / \ | / \
+        //     |    /   \|/   \| ... |/   \|/   \
+        //    ---  4-----0-----+-...-+-----+-----+
         //            |--| = d
         static void addStrip(ui::vertex*& out, float x0, float y0, float d, float r, int i,
-                             const FLOATX4*& colors, size_t n, ui::vertex cv, bool inv = false) {
+                             const FLOATX4*& colors, size_t n, bool inv = false) {
+            float q = r > d ? sqrtf(r * r - d * d) : 0;
+            float x1[] = {-d, +q, +d, -q};
+            float y1[] = {-q, -d, +q, +d};
+            float x2[] = { 0, +r,  0, -r};
+            float y2[] = {-r,  0, +r, 0 };
+            float x3[] = {+d, +q, -d, -q};
+            float y3[] = {-q, +d, +q, -d};
+            float ux[] = {-d,  0, +d,  0};
+            float uy[] = { 0, -d,  0, +d};
+            ui::vertex cv = {{x0 + ux[i], y0 + uy[i], 0}, {}, {}};
             while (n--) {
-                float q = sqrtf(r * r - d * d);
-                float x1[] = {x0 - d, x0 + q, x0 + d, x0 - q};
-                float y1[] = {y0 - q, y0 - d, y0 + q, y0 + d};
-                float x2[] = {x0    , x0 + r, x0,     x0 - r};
-                float y2[] = {y0 - r, y0,     y0 + r, y0    };
-                float x3[] = {x0 + d, x0 + q, x0 - d, x0 - q};
-                float y3[] = {y0 - q, y0 + d, y0 + q, y0 - d};
-                out++->pos = {x0,    y0,    0};
-                out++->pos = {x1[i], y1[i], 0};
-                out++->pos = {x2[i], y2[i], 0};
-                out++->pos = {x2[i], y2[i], 0};
-                out++->pos = {x3[i], y3[i], 0};
-                out++->pos = {x0,    y0,    0};
+                out++->pos = {x0,         y0,         0};
+                out++->pos = {x0 + x1[i], y0 + y1[i], 0};
+                out++->pos = {x0 + x2[i], y0 + y2[i], 0};
+                out++->pos = {x0 + x2[i], y0 + y2[i], 0};
+                out++->pos = {x0 + x3[i], y0 + y3[i], 0};
+                out++->pos = {x0,         y0,         0};
                 out[-6].clr = out[-1].clr = c2v(inv ? *--colors : *colors++);
                 auto z = out[-5], w = out[-6];
                 *out++ = cv;
@@ -380,26 +383,27 @@ namespace appui {
                 cv = out[-9];
                 (i % 2 ? y0 : x0) += i < 2 ? d * 2 : d * -2;
             }
+            auto z = out[-5];
+            *out++ = cv;
+            *out++ = z;
+            out++->pos = {x0 + ux[i], y0 + uy[i], 0};
         }
 
         void drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override {
-            std::vector<ui::vertex> vs((w_ + h_) * 18 + m_ * 18 + 6);
-            auto r = (float)std::min(total.right - total.left, total.bottom - total.top) / 10;
-            auto dw = (float)(total.right - total.left - r*2) / (w_ - 1);
-            auto dh = (float)(total.bottom - total.top - r*3) / (h_ - 1);
-            auto dm = (float)(total.right - total.left - r*2) / (m_ - 1);
+            std::vector<ui::vertex> vs((w_ + h_) * 18 + m_ * 18 + 24);
+            auto r = std::max(5.f, std::min(total.right - total.left, total.bottom - total.top) / 10.f);
+            auto dw = (float)(total.right - total.left - r*2) / w_;
+            auto dh = (float)(total.bottom - total.top - r*3) / h_;
+            auto dm = (float)(total.right - total.left) / (m_ + 1);
             ui::vertex center[] = {QUADP(total.left + r, total.top + r, total.right - r, total.bottom - r * 2, 0, 0, 0, 0, 0)};
             ui::vertex* out = vs.data();
             const FLOATX4* in = colors.data();
-            addStrip(out, total.left  + r, total.top    + r,   dw / 2, r, 0, in, w_, vs[0]);
-            addStrip(out, total.right - r, total.top    + r,   dh / 2, r, 1, in, h_, out[-5]);
-            addStrip(out, total.right - r, total.bottom - r*2, dw / 2, r, 2, in, w_, out[-5]);
-            addStrip(out, total.left  + r, total.bottom - r*2, dh / 2, r, 3, in, h_, out[-5]);
-            addStrip(out, total.left  + r, total.bottom - r,   dm / 2, r / 2, 0, in, m_, vs[0]);
-            addStrip(out, total.right - r, total.bottom - r,   dm / 2, r / 2, 2, in, m_, out[-5], true);
-            // Connect top-left corner and left edge of the music LEDs.
-            vs[6] = vs[(w_ + h_) * 18 - 5];
-            vs[(w_ + h_) * 18 + 6] = out[-5];
+            addStrip(out, total.left  + r + dw / 2, total.top    + r,            dw / 2, r,     0, in, w_);
+            addStrip(out, total.right - r,          total.top    + r + dh / 2,   dh / 2, r,     1, in, h_);
+            addStrip(out, total.right - r - dw / 2, total.bottom - r*2,          dw / 2, r,     2, in, w_);
+            addStrip(out, total.left  + r,          total.bottom - r*2 - dh / 2, dh / 2, r,     3, in, h_);
+            addStrip(out, total.left  + dm,         total.bottom - r/2,          dm / 2, r / 2, 0, in, m_);
+            addStrip(out, total.right - dm,         total.bottom - r/2,          dm / 2, r / 2, 2, in, m_, true);
             // Fill the middle of the screen.
             for (size_t i = 0; i < 6; i++)
                 *out++ = {center[i].pos, {0, 0, 0, .8f}, {}};
