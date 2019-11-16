@@ -681,6 +681,10 @@ int ui::main() {
     };
 
     auto openPreview = [&] {
+        if (previewing) {
+            previewWindow->focus();
+            return;
+        }
         previewWindow.reset();
         preview = std::make_unique<appui::preview>(config.width.load(), config.height.load(), config.musicLeds.load());
         previewing = true;
