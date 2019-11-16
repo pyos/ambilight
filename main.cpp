@@ -497,22 +497,22 @@ int ui::main() {
     bool frameDirty = false;
 
     mainWindow.onMessage.addForever([&](uintptr_t) {
-        if (lastPreview != -1) {
-            std::lock_guard<std::mutex> lock(mut);
-            preview->setColors(frameData[0], frameData[1], frameData[2], frameData[3]);
-        }
+        if (lastPreview != -1)
+            if (auto lk = std::unique_lock<std::mutex>(mut))
+                preview->setColors(frameData[0], frameData[1], frameData[2], frameData[3]);
     });
 
     auto updateLocked = [&](auto&& unsafePart) {
-        std::lock_guard<std::mutex> lock(mut);
-        unsafePart();
-        frameDirty = true;
-        frameEv.notify_all();
-        if (auto was = lastPreview.load(); was >= 0) {
+        if (auto lk = std::unique_lock<std::mutex>(mut)) {
+            unsafePart();
+            frameDirty = true;
+            frameEv.notify_all();
+        }
+        if (auto was = lastPreview.load(); was != -1) {
             auto now = std::chrono::steady_clock::now().time_since_epoch().count();
-            if (now - was > std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::milliseconds(16)).count()
-             && lastPreview.compare_exchange_strong(was, now))
-                mainWindow.post(0);
+            if (now - was > std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::milliseconds(16)).count())
+                if (lastPreview.compare_exchange_strong(was, now))
+                    mainWindow.post(0);
         }
     };
 
