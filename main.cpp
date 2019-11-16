@@ -686,7 +686,7 @@ int ui::main() {
         previewWindow->setBackground(0xcc111111u);
         previewWindow->setTitle(L"Ambilight Preview");
         previewWindow->setShadow(true);
-        previewWindow->onClose.addForever([&] { previewing = false; });
+        previewWindow->onDestroy.addForever([&] { previewing = false; });
         previewWindow->show();
     };
 
