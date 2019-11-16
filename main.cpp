@@ -309,6 +309,133 @@ namespace appui {
         padded<texslider<1>> satSlider{{10, 10, 10, 10}};
         gray_bg colorTab{colorGrid.pad};
     };
+
+    struct preview_render : ui::widget {
+        preview_render(size_t w, size_t h, size_t musicLeds)
+            : colors((w + h) * 2 + musicLeds)
+            , w_(w)
+            , h_(h)
+            , m_(musicLeds)
+        {}
+
+        void setColors(const FLOATX4* bl /* w+h */, const FLOATX4* rt /* w+h */,
+                       const FLOATX4* ml /* m/2 */, const FLOATX4* mr /* m/2 */) {
+            // Order in `colors`: clockwise from top left, then music LEDs left to right.
+            auto out = colors.data();
+            for (size_t x = w_; x--; ) *out++ = rt[x + h_];
+            for (size_t y = h_; y--; ) *out++ = rt[y];
+            for (size_t x = w_; x--; ) *out++ = *bl++;
+            for (size_t y = h_; y--; ) *out++ = *bl++;
+            for (size_t i = m_ / 2; i--; ) *out++ = ml[i];
+            for (size_t i = m_ / 2; i--; ) *out++ = *mr++;
+            invalidate();
+        }
+
+    private:
+        POINT measureMinImpl() const override {
+            auto r = (float)std::min(w_, h_) / (10 - 2);
+            return {(LONG)(w_ + r * 2), (LONG)(h_ + r * 3)};
+        }
+
+        POINT measureImpl(POINT fit) const override {
+            auto r = (float)std::min(fit.x, fit.y) / 10;
+            return {std::min(fit.x, (LONG)round(r*2 + (fit.y - r*3) * (w_ - 1) / (h_ - 1))),
+                    std::min(fit.y, (LONG)round(r*3 + (fit.x - r*2) * (h_ - 1) / (w_ - 1)))};
+        }
+
+        static DirectX::XMFLOAT4 c2v(FLOATX4 c) {
+            // LEDs do not actually emit black, so move brightness to alpha.
+            auto v = c.a ? (c.r > c.b ? c.r > c.g ? c.r : c.g : c.g > c.b ? c.g : c.b) / c.a : 0.f;
+            return v ? DirectX::XMFLOAT4{c.r / v, c.g / v, c.b / v, c.a * v}
+                     : DirectX::XMFLOAT4{0, 0, 0, 0};
+        }
+
+        //    ---       -2-   -+ ... +-   -+-
+        //     |      1- | -3- | ... | -+- | -+  Total N*9 vertices.
+        // r = |     / \ | / \ | ... | / \ | /
+        //     |    /   \|/   \| ... |/   \|/
+        //    ---  4-----0-----+-...-+-----+
+        //            |--| = d
+        static void addStrip(ui::vertex*& out, float x0, float y0, float d, float r, int i,
+                             const FLOATX4*& colors, size_t n, ui::vertex cv, bool inv = false) {
+            while (n--) {
+                float q = sqrtf(r * r - d * d);
+                float x1[] = {x0 - d, x0 + q, x0 + d, x0 - q};
+                float y1[] = {y0 - q, y0 - d, y0 + q, y0 + d};
+                float x2[] = {x0    , x0 + r, x0,     x0 - r};
+                float y2[] = {y0 - r, y0,     y0 + r, y0    };
+                float x3[] = {x0 + d, x0 + q, x0 - d, x0 - q};
+                float y3[] = {y0 - q, y0 + d, y0 + q, y0 - d};
+                out++->pos = {x0,    y0,    0};
+                out++->pos = {x1[i], y1[i], 0};
+                out++->pos = {x2[i], y2[i], 0};
+                out++->pos = {x2[i], y2[i], 0};
+                out++->pos = {x3[i], y3[i], 0};
+                out++->pos = {x0,    y0,    0};
+                out[-6].clr = out[-1].clr = c2v(inv ? *--colors : *colors++);
+                auto z = out[-5], w = out[-6];
+                *out++ = cv;
+                *out++ = z;
+                *out++ = w;
+                cv = out[-9];
+                (i % 2 ? y0 : x0) += i < 2 ? d * 2 : d * -2;
+            }
+        }
+
+        void drawImpl(ui::dxcontext& ctx, ID3D11Texture2D* target, RECT total, RECT dirty) const override {
+            std::vector<ui::vertex> vs((w_ + h_) * 18 + m_ * 18 + 6);
+            auto r = (float)std::min(total.right - total.left, total.bottom - total.top) / 10;
+            auto dw = (float)(total.right - total.left - r*2) / (w_ - 1);
+            auto dh = (float)(total.bottom - total.top - r*3) / (h_ - 1);
+            auto dm = (float)(total.right - total.left - r*2) / (m_ - 1);
+            ui::vertex center[] = {QUADP(total.left + r, total.top + r, total.right - r, total.bottom - r * 2, 0, 0, 0, 0, 0)};
+            ui::vertex* out = vs.data();
+            const FLOATX4* in = colors.data();
+            addStrip(out, total.left  + r, total.top    + r,   dw / 2, r, 0, in, w_, vs[0]);
+            addStrip(out, total.right - r, total.top    + r,   dh / 2, r, 1, in, h_, out[-5]);
+            addStrip(out, total.right - r, total.bottom - r*2, dw / 2, r, 2, in, w_, out[-5]);
+            addStrip(out, total.left  + r, total.bottom - r*2, dh / 2, r, 3, in, h_, out[-5]);
+            addStrip(out, total.left  + r, total.bottom - r,   dm / 2, r / 2, 0, in, m_, vs[0]);
+            addStrip(out, total.right - r, total.bottom - r,   dm / 2, r / 2, 2, in, m_, out[-5], true);
+            // Connect top-left corner and left edge of the music LEDs.
+            vs[6] = vs[(w_ + h_) * 18 - 5];
+            vs[(w_ + h_) * 18 + 6] = out[-5];
+            // Fill the middle of the screen.
+            for (size_t i = 0; i < 6; i++)
+                *out++ = {center[i].pos, {0, 0, 0, .8f}, {}};
+            ctx.draw(target, ctx.cached<ID3D11Texture2D, extraWidgets>(), vs, dirty);
+        }
+
+    private:
+        std::vector<FLOATX4> colors;
+        size_t w_;
+        size_t h_;
+        size_t m_;
+    };
+
+    struct preview : ui::grid {
+        preview(size_t w, size_t h, size_t musicLeds)
+            : ui::grid{1, 2}
+            , render({20, 20, 20, 20}, w, h, musicLeds)
+        {
+            titlebar.set({nullptr, &min, &close});
+            titlebar.set(0, 0, &title, ui::grid::align_global_center);
+            titlebar.setColStretch(0, 1);
+            set({&titlebar, &render.pad});
+            setPrimaryCell(0, 1);
+        }
+
+        void setColors(const FLOATX4 *bl, const FLOATX4 *rt, const FLOATX4 *ml, const FLOATX4 *mr) {
+            render.setColors(bl, rt, ml, mr);
+        }
+
+    private:
+        ui::grid titlebar{3, 1};
+        ui::label title{{{L"Ambilight Preview", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 16}}};
+        ui::win_minimize min;
+        ui::win_close close;
+        padded<preview_render> render;
+    };
 }
 
 int ui::main() {
@@ -340,10 +467,13 @@ int ui::main() {
         ui::quit();
     });
 
+    std::unique_ptr<appui::preview> preview;
     std::unique_ptr<ui::window> sizingWindow;
     std::unique_ptr<ui::window> tooltipWindow;
+    std::unique_ptr<ui::window> previewWindow;
     appui::sizing_config sizingConfig{config};
     appui::tooltip_config tooltipConfig{config};
+    std::atomic<int64_t> lastPreview{-1};
 
     std::atomic<bool> terminate{false};
     // These more granular mutexes (mutices?) synchronize writes to each pair of strips
@@ -366,12 +496,24 @@ int ui::main() {
     FLOATX4 averageColor = u2qd(config.color);
     bool frameDirty = false;
 
+    mainWindow.onMessage.addForever([&](uintptr_t) {
+        if (lastPreview != -1) {
+            std::lock_guard<std::mutex> lock(mut);
+            preview->setColors(frameData[0], frameData[1], frameData[2], frameData[3]);
+        }
+    });
+
     auto updateLocked = [&](auto&& unsafePart) {
         std::lock_guard<std::mutex> lock(mut);
         unsafePart();
         frameDirty = true;
         frameEv.notify_all();
-        // TODO render a preview somewhere -- can't think of a good UI
+        if (auto was = lastPreview.load(); was >= 0) {
+            auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+            if (now - was > std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::milliseconds(16)).count()
+             && lastPreview.compare_exchange_strong(was, now))
+                mainWindow.post(0);
+        }
     };
 
     auto loopThread = [&](auto&& f) {
@@ -538,11 +680,27 @@ int ui::main() {
         }
     };
 
+    auto openPreview = [&] {
+        previewWindow.reset();
+        preview = std::make_unique<appui::preview>(config.width.load(), config.height.load(), config.musicLeds.load());
+        lastPreview = std::chrono::steady_clock::now().time_since_epoch().count();
+        mainWindow.post(0);
+        previewWindow = std::make_unique<ui::window>(800, 600, 100, 100);
+        previewWindow->setRoot(preview.get());
+        previewWindow->setBackground(0xcc111111u);
+        previewWindow->setTitle(L"Ambilight Preview");
+        previewWindow->setShadow(true);
+        previewWindow->onClose.addForever([&] { lastPreview = -1; });
+        previewWindow->show();
+    };
+
     auto showSizeConfig = [&] {
         mainWindow.clearNotificationIcon();
         auto w = GetSystemMetrics(SM_CXSCREEN);
         auto h = GetSystemMetrics(SM_CYSCREEN);
         auto s = std::min(w, h) * 3 / 4;
+        previewWindow.reset();
+        preview.reset();
         sizingWindow = std::make_unique<ui::window>(s, s, (w - s) / 2, (h - s) / 2);
         sizingWindow->setRoot(&sizingConfig);
         sizingWindow->setBackground(0xcc111111u);
@@ -576,8 +734,9 @@ int ui::main() {
     tooltipConfig.onColor.addForever([&](uint32_t c) { setVideoPattern(u2qd(config.color = c)); });
 
     winapi::holder<HMENU, DestroyMenu> menu{CreatePopupMenu()};
-    winapi::throwOnFalse(AppendMenu(menu.get(), MF_STRING, 1, L"Reconfigure..."));
-    winapi::throwOnFalse(AppendMenu(menu.get(), MF_STRING, 2, L"Quit"));
+    winapi::throwOnFalse(AppendMenu(menu.get(), MF_STRING, 1, L"Preview"));
+    winapi::throwOnFalse(AppendMenu(menu.get(), MF_STRING, 2, L"Reconfigure..."));
+    winapi::throwOnFalse(AppendMenu(menu.get(), MF_STRING, 3, L"Quit"));
 
     mainWindow.onNotificationIcon.addForever([&](POINT p, bool primary) {
         if (tooltipWindow)
@@ -585,8 +744,9 @@ int ui::main() {
         if (!primary) {
             mainWindow.focus();
             switch (TrackPopupMenuEx(menu.get(), TPM_RETURNCMD|TPM_NONOTIFY|TPM_RIGHTBUTTON, p.x, p.y, mainWindow, nullptr)) {
-                case 1: showSizeConfig(); break;
-                case 2: mainWindow.close(); break;
+                case 1: openPreview(); break;
+                case 2: showSizeConfig(); break;
+                case 3: mainWindow.close(); break;
             }
             return;
         }
