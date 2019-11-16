@@ -67,13 +67,13 @@ struct AudioOutputCapturer : IAudioCapturer, private IMMNotificationClient {
 
         // FFT works fastest when the sample count is a product of powers of 2, 3, and 5.
         size_t n = kiss_fftr_next_fast_size_real(format.nSamplesPerSec / DFT_RESOLUTION);
-        samplesL.resize(n);
-        samplesR.resize(n);
+        for (auto& sv : samples)
+            sv.resize(n);
         // Output range: [0, DFT_RESOLUTION, DFT_RESOLUTION*2, ..., Nyquist frequency].
         fft.reset(kiss_fftr_alloc(n, 0, nullptr, nullptr));
         fftBuffer.resize(n / 2 + 1);
         // Discard 0 Hz, group the rest into octaves. First half is left channel, second half is right channel.
-        mapped.resize(log2fp1(n / 2) * 2);
+        mapped.resize(log2fp1(n / 2) * ARRAYSIZE(samples));
 
         winapi::throwOnFalse(audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED,
             AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 0, 0, formatPtr, NULL));
@@ -109,25 +109,24 @@ private:
     bool handleSound(BYTE* data, UINT32 frames) {
         bool haveUpdates = false;
         auto second = format.nChannels > 1 ? format.wBitsPerSample / 8 : 0;
-        auto shift = samplesL.size() / DFT_RUNS_PER_FILL;
-        for (UINT i = 0; frames--; i += format.nBlockAlign) {
-            samplesL[nextSample] = data ? reader(&data[i]) : 0;
-            samplesR[nextSample] = data ? reader(&data[i + second]) : 0;
-            if (++nextSample != samplesL.size())
+        auto shift = samples[0].size() / DFT_RUNS_PER_FILL;
+        for (size_t i = 0; frames--; i += format.nBlockAlign) {
+            samples[0][nextSample] = data ? reader(&data[i]) : 0;
+            samples[1][nextSample] = data ? reader(&data[i + second]) : 0;
+            if (++nextSample != samples[0].size())
                 continue; // Not enough for a DFT run yet.
             if (data) {
-                size_t half = mapped.size() / 2;
-                mapTimeToLogFreq(samplesL, {mapped.data(), half});
-                mapTimeToLogFreq(samplesR, {mapped.data() + half, half});
+                size_t part = mapped.size() / ARRAYSIZE(samples);
+                for (size_t j = 0; j < ARRAYSIZE(samples); j++)
+                    mapTimeToLogFreq(samples[j], {&mapped[j * part], part});
                 haveUpdates = true;
             } else if (std::any_of(mapped.begin(), mapped.end(), [](float c) { return c > 1e-5; })) {
                 for (auto& c : mapped) c *= DFT_EWMA_DROP;
                 haveUpdates = true;
             }
-            if (nextSample -= shift) {
-                std::copy(samplesL.begin() + shift, samplesL.end(), samplesL.begin());
-                std::copy(samplesR.begin() + shift, samplesR.end(), samplesR.begin());
-            }
+            if (nextSample -= shift)
+                for (auto& sv : samples)
+                    std::copy(sv.begin() + shift, sv.end(), sv.begin());
         }
         return haveUpdates;
     }
@@ -164,8 +163,7 @@ private:
     winapi::com_ptr<IAudioClient> audioClient;
     winapi::com_ptr<IAudioCaptureClient> captureClient;
     std::unique_ptr<kiss_fftr_state, fft_release> fft;
-    std::vector<kiss_fft_scalar> samplesL;
-    std::vector<kiss_fft_scalar> samplesR;
+    std::vector<kiss_fft_scalar> samples[2];
     std::vector<kiss_fft_cpx> fftBuffer;
     std::vector<float> mapped;
     std::atomic<bool> deviceChanged{false};
