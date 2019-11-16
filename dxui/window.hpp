@@ -94,6 +94,10 @@ namespace ui {
             draw();
         }
 
+        // Send a message to the thread that owns this window (see `onMessage`).
+        // If it is the current thread, block until the message is processed.
+        void post(uintptr_t data);
+
         void captureMouse(widget& target) {
             // assert(!mouseCapture);
             mouseCapture = &target;
@@ -133,6 +137,9 @@ namespace ui {
         // Fired when the system theme colors changes. Default action is to redraw
         // all widgets.
         util::event<> onSystemColorsChange;
+
+        // Fired when `post` is called and the message reaches the thread that owns this window.
+        util::event<uintptr_t> onMessage;
 
     private:
         void draw() { draw({0, 0, size.x, size.y}); }

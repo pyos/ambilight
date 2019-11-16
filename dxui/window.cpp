@@ -184,6 +184,12 @@ LRESULT ui::window::windowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lPar
             case WM_CONTEXTMENU:
                 window->onNotificationIcon(POINT{GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam)}, false);
                 break;
+            default:
+                break;
+        }
+        case WM_USER+1: {
+            window->onMessage((uintptr_t)lParam);
+            break;
         }
     }
     return DefWindowProc(handle, msg, wParam, lParam);
@@ -347,4 +353,8 @@ void ui::window::onMouseLeave() {
     mouseInBounds = false;
     if (root)
         root->onMouseLeave();
+}
+
+void ui::window::post(uintptr_t data) {
+    SendNotifyMessage(*this, WM_USER+1, 0, (LPARAM)data);
 }
