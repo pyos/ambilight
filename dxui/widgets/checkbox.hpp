@@ -32,7 +32,7 @@ namespace ui {
     private:
         RECT getInner() const override { return ui::texrect::getInner(); }
         RECT getOuter() const override {
-            auto b = button::getState();
+            auto b = button::currentState;
             return builtinRect(
                 s == checked ?
                     b == button::hover  ? CHECKBOX_CHECKED_HOVER :

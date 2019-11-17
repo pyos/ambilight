@@ -10,14 +10,14 @@ namespace ui {
             if (auto __w = parentWindow()) clickAction(*__w), invalidate(); }); }       \
     protected:                                                                          \
         RECT getOuter() const override {                                                \
-            switch (getState()) {                                                       \
+            switch (currentState) {                                                     \
             default:     return builtinRect(rect##_OUTER);                              \
             case hover:  return builtinRect(rect##_OUTER_HOVER);                        \
             case active: return builtinRect(rect##_OUTER_ACTIVE);                       \
             }                                                                           \
         }                                                                               \
         RECT getInner() const override {                                                \
-            switch (getState()) {                                                       \
+            switch (currentState) {                                                     \
             default:     return builtinRect(rect##_INNER);                              \
             case hover:  return builtinRect(rect##_INNER_HOVER);                        \
             case active: return builtinRect(rect##_INNER_ACTIVE);                       \
