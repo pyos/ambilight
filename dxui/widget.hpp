@@ -128,7 +128,7 @@ namespace ui {
 
     private:
         widget_parent* parent = nullptr;
-        mutable RECT lastDrawRect = RECT_ID;
+        mutable RECT lastDrawRect = EMPTY_RECT;
         mutable POINT lastMeasureMin = {-1, -1};
         mutable POINT lastMeasureArg = {-1, -1};
         mutable POINT lastMeasureRes;

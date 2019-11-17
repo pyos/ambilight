@@ -66,10 +66,10 @@
     })
 
 namespace ui {
-    // The identity rectangle:
-    //     rectUnion(RECT_ID, x) == x
-    //     rectIntersection(RECT_ID, x) == x
-    static constexpr RECT RECT_ID = {LONG_MAX, LONG_MAX, LONG_MIN, LONG_MIN};
+    // The zero rectangle:
+    //     rectUnion(EMPTY_RECT, x) == x
+    //     rectIntersection(EMPTY_RECT, x) == EMPTY_RECT
+    static constexpr RECT EMPTY_RECT = {LONG_MAX, LONG_MAX, LONG_MIN, LONG_MIN};
 
     // Test if a rectangle is non-empty.
     static constexpr bool rectValid(RECT r) {
