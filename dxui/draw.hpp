@@ -32,13 +32,31 @@
 
 // Same as `QUAD`, but all coordinates are in pixels. These are suitable
 // for passing to `ui::dxcontext::draw`.
+//
+// Let's say we replace `tA` and `tB` with `x` and `y`. First pixel has coordinate `a + .5`.
+// The texture position after linear interpolation will therefore be `x + .5 * (y - x) / (b - a)`;
+// we want it to be `tA + .5`. Similarly, `b - .5` maps to `y - .5 * (y - x) / (b - a)`,
+// which should become `tB - .5`.
+//     tA + .5 = x + (y - x) / 2(b - a)
+//     tB - .5 = y - (y - x) / 2(b - a)
+//  => x = tA - (tB - tA - 1)/(b - a - 1)/2 + 1/2
+//     y = tB + (tB - tA - 1)/(b - a - 1)/2 - 1/2
+//
 #define QUADP(L, T, R, B, Z, tL, tT, tR, tB) \
-    QUAD((float)(L), (float)(T), (float)(R), (float)(B), Z, (float)(tL)+.5f, (float)(tT)+.5f, (float)(tR)-.5f, (float)(tB)-.5f)
+    QUAD((float)(L), (float)(T), (float)(R), (float)(B), Z, \
+        (float)(tL) + .5f - .5f * (float)((tR) - (tL) - 1) / (float)((R) - (L) - 1), \
+        (float)(tT) + .5f - .5f * (float)((tB) - (tT) - 1) / (float)((B) - (T) - 1), \
+        (float)(tR) - .5f + .5f * (float)((tR) - (tL) - 1) / (float)((R) - (L) - 1), \
+        (float)(tB) - .5f + .5f * (float)((tB) - (tT) - 1) / (float)((B) - (T) - 1))
 
 // Same as `QUADR`, but all coordinates are in pixels. Or, same as `QUADP`,
 // but the texture rectangle is rotated 90 degrees clockwise.
 #define QUADPR(L, T, R, B, Z, tL, tT, tR, tB) \
-    QUADR((float)(L), (float)(T), (float)(R), (float)(B), Z, (float)(tL)+.5f, (float)(tT)+.5f, (float)(tR)-.5f, (float)(tB)-.5f)
+    QUADR((float)(L), (float)(T), (float)(R), (float)(B), Z, \
+        (float)(tL) + .5f - .5f * (float)((tR) - (tL) - 1) / (float)((B) - (T) - 1), \
+        (float)(tT) + .5f - .5f * (float)((tB) - (tT) - 1) / (float)((R) - (L) - 1), \
+        (float)(tR) - .5f + .5f * (float)((tR) - (tL) - 1) / (float)((B) - (T) - 1), \
+        (float)(tB) - .5f + .5f * (float)((tB) - (tT) - 1) / (float)((R) - (L) - 1))
 
 // Convert an A8R8G8B8 color into R32G32B32A32 used by the shaders.
 #define ARGB2CLR(u) \
