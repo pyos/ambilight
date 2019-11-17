@@ -33,15 +33,35 @@
 // Same as `QUAD`, but all coordinates are in pixels. These are suitable
 // for passing to `ui::dxcontext::draw`.
 //
-// Let's say we replace `tA` and `tB` with `x` and `y`. First pixel has coordinate `a + .5`.
-// The texture position after linear interpolation will therefore be `x + .5 * (y - x) / (b - a)`;
-// we want it to be `tA + .5`. Similarly, `b - .5` maps to `y - .5 * (y - x) / (b - a)`,
-// which should become `tB - .5`.
-//     tA + .5 = x + (y - x) / 2(b - a)
-//     tB - .5 = y - (y - x) / 2(b - a)
-//  => x = tA - (tB - tA - 1)/(b - a - 1)/2 + 1/2
-//     y = tB + (tB - tA - 1)/(b - a - 1)/2 - 1/2
+// So here's the thing: consider the top left corner of the quad, for example.
+// Suppose it has coordinates (0, 0). This is in *continuous* space; however,
+// both the screen and the texture are composed of dots. So each dot is mapped
+// to the middle of each continuous square, e.g. the top left pixel at the
+// rasterizer stage will actually have screen space coordinate (.5, .5).
 //
+// Now, the texture coordinates are linearly interpolated, so if we set texture
+// coordinate (0, 0) for the upper left corner, the result for pixel at (.5, .5)
+// at scale 1 is also (.5, .5), the texture is sampled precisely at that texel,
+// and all is fine. However, imagine we scale the texture up at 2x. Then linear
+// interpolation would give texcoord (.25, .25) at screen coord (.5, .5). If
+// the texture is in fact in the middle of a texture atlas, this will cause
+// the output to have random colors from adjacent textures mixed in, which
+// is obviously bad.
+//
+// To fix this problem, we slightly adjust the texture coordinates so that
+// screen space pixel (L + .5, T + .5), i.e. the top left filled pixel,
+// *always* samples the texture at (tL + .5, tT + .5) (and similarly for the
+// bottom right corner). To do that, consider a 1D slice of screen space:
+//      L----X-------------Y----R,   where d(L, X) = d(Y, R) = 0.5
+// which we want to linearly map to the texture space interval:
+//          P---Q-------V---W,  where P and W are the points we're looking for
+// such that X maps to Q and Y maps to V, and locations of Q and V we know because
+//           tL-Q-------V-tR    d(tL, Q) = d(V, tR) = 0.5
+// Since it's all linearly interpolated, d(L, X) / d(P, Q) = d(X, Y) / d(Q, V).
+// This means d(P, Q) = d(Q, V) / d(X, Y) * d(L, X); together with P = tL
+// + d(tL, Q) - d(P, Q) this gives us
+//     P = tL + 0.5 - (d(tL, tR) - 1) / (d(L, R) - 1) * 0.5
+// Similarly for W, and then for two points in the orthogonal direction.
 #define QUADP(L, T, R, B, Z, tL, tT, tR, tB) \
     QUAD((float)(L), (float)(T), (float)(R), (float)(B), Z, \
         (float)(tL) + .5f - .5f * (float)((tR) - (tL) - 1) / (float)((R) - (L) - 1), \
