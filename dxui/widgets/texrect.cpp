@@ -54,6 +54,15 @@ RECT ui::builtinRect(builtin_rect r) {
         rects[WIN_ICON_MAXIMIZE]              = map.at("window icon maximize");
         rects[WIN_ICON_UNMAXIMIZE]            = map.at("window icon unmaximize");
         rects[WIN_ICON_MINIMIZE]              = map.at("window icon minimize");
+        rects[CHECKBOX]                       = map.at("checkbox");
+        rects[CHECKBOX_HOVER]                 = map.at("checkbox hover");
+        rects[CHECKBOX_ACTIVE]                = map.at("checkbox active");
+        rects[CHECKBOX_CHECKED]               = map.at("checkbox checked");
+        rects[CHECKBOX_CHECKED_HOVER]         = map.at("checkbox checked hover");
+        rects[CHECKBOX_CHECKED_ACTIVE]        = map.at("checkbox checked active");
+        rects[CHECKBOX_PARTIAL]               = map.at("checkbox partial");
+        rects[CHECKBOX_PARTIAL_HOVER]         = map.at("checkbox partial hover");
+        rects[CHECKBOX_PARTIAL_ACTIVE]        = map.at("checkbox partial active");
         return 0;
     }();
     return rects[r];

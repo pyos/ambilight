@@ -12,6 +12,16 @@
  49,  11,    0,   0,  button borderless inner
  11,  33,    0,   0,  button borderless inner hover
  11,  55,    0,   0,  button borderless inner active
+# checkbox (kind of a button)
+  0,  72,   24,  24,  checkbox
+ 24,  72,   24,  24,  checkbox hover
+ 48,  72,   24,  24,  checkbox active
+ 72,  72,   24,  24,  checkbox checked
+ 96,  72,   24,  24,  checkbox checked hover
+  0,  96,   24,  24,  checkbox checked active
+ 24,  96,   24,  24,  checkbox partial
+ 48,  96,   24,  24,  checkbox partial hover
+ 72,  96,   24,  24,  checkbox partial active
 # sliders
  22,   0,   15,  32,  slider track
  22,  32,   15,   3,  slider groove
