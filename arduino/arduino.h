@@ -41,12 +41,15 @@ namespace {
         uint8_t Z, B, G, R;
 
         LED(int r, int g, int b) {
-            int c = r | g | b;
-            int z = (c < 4096) + (c < 2048) + (c < 1024) + (c < 512) + (c < 256);
-            Z = 0xE0 | 0x1F >> z; // 111zzzzz where zzzzz = 0..31 is global brightness
-            B = b << z >> 8; // This effectively increases precision of dark (where
-            G = g << z >> 8; // every channel is below a certain threshold) colors.
-            R = r << z >> 8;
+            // Divide all channels by some number from 1 to 32 that minimizes the rounding error
+            // while keeping the result below 256. This feature is the major advantage of APA102.
+            // TODO round to gray, not down; maybe figure out a faster way to compute this
+            for (int d = INT_MAX, i = (r > b ? r > g ? r : g : b > g ? b : g) / 256 + 1; i < 33; i++) {
+                int rd = r / i, gd = g / i, bd = b / i,
+                    rm = r % i, gm = g % i, bm = b % i;
+                if (d > rm + gm + bm)
+                    d = rm + gm + bm, Z = 0xE0 | (i - 1), R = rd, G = gd, B = bd;
+            }
         }
 #else
         static constexpr int scale = 255;
