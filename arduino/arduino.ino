@@ -172,9 +172,12 @@ void setup() {
 void loop() {
   for (uint8_t i = 1; !Serial.find("<RGBDATA"); i++) {
     if (i % 4 /* seconds */ == 0) {
-      memset(data, 0, sizeof(data));
       // TODO there's 256 bytes in EEPROM, maybe store a simple default pattern there?
-      data[2][0][0] = data[3][0][0] = LED(10, 0, 0);
+      for (auto& strip : data)
+        for (auto& chunk : strip)
+          for (auto& led : chunk)
+            led = LED(0, 0, 0, 0);
+      data[2][0][0] = data[3][0][0] = LED(10 << 8, 0, 0, 3 << 8);
       strip01.show((byte*)data[0], (byte*)data[1], CHUNK_BYTE_SIZE * AMBILIGHT_CHUNKS_PER_STRIP);
       strip23.show((byte*)data[2], (byte*)data[3], CHUNK_BYTE_SIZE * AMBILIGHT_CHUNKS_PER_STRIP);
       valid = false;
