@@ -27,11 +27,11 @@
 #include <stdint.h>
 
 namespace {
-    struct LED {
-#if AMBILIGHT_USE_SPI
+    struct Y5B8G8R8 /* APA102-like */ {
         uint8_t Z, B, G, R;
 
-        LED(uint32_t r, uint32_t g, uint32_t b, uint16_t /*y*/) {
+        Y5B8G8R8() : Z(0xE0), B(0), G(0), R(0) {}
+        Y5B8G8R8(uint32_t r, uint32_t g, uint32_t b, uint16_t /*y*/) {
             r *= 31, g *= 31, b *= 31;
             // APA102 has an effective 13 bit dynamic range thanks to its 5-bit global brightness
             // field. A lot of pairs in 1..32 are coprime, so picking the smallest possible
@@ -44,10 +44,13 @@ namespace {
                     d = rm + gm + bm, Z = 0xE0 | i, R = rd, G = gd, B = bd;
             }
         }
-#else
+    };
+
+    struct G8R8B8 /* WS2812-like */ {
         uint8_t G, R, B;
 
-        LED(uint16_t r, uint16_t g, uint16_t b, uint16_t y)
+        G8R8B8() : G(0), R(0), B(0) {}
+        G8R8B8(uint16_t r, uint16_t g, uint16_t b, uint16_t y)
             // Rounding each component separately can magnify relative differences due to errors,
             // e.g. 16, 17, 16 (barely greenish dark gray) at gamma 2.0 and brightness 70% will
             // become 0, 1, 0 (obvious dark green), so round Cr/Cg/Cb instead.
@@ -55,12 +58,13 @@ namespace {
             , R(((r - y + 128) >> 8) + ((y + 128) >> 8))
             , B(((b - y + 128) >> 8) + ((y + 128) >> 8))
         {}
-#endif
-
-        LED() : LED(0, 0, 0, 0) {}
-        bool operator==(const LED& x) const { return R == x.R && G == x.G && B == x.B; }
-        bool operator!=(const LED& x) const { return R != x.R || G != x.G || B != x.B; }
     };
+
+#if AMBILIGHT_USE_SPI
+    using LED = Y5B8G8R8;
+#else
+    using LED = G8R8B8;
+#endif
 }
 
 static_assert(AMBILIGHT_CHUNKS_PER_STRIP < 63, "exceeding protocol limitations");
