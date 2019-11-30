@@ -253,7 +253,7 @@ namespace appui {
 
             gammaGrid.set({&yLabel.pad, &ySlider.pad,
                            &tLabel.pad, &tSlider.pad,
-                           nullptr,     &mSlider.pad});
+                           &mLabel.pad, &mSlider.pad});
             gammaGrid.setColStretch(1, 1);
             ySlider.setValue((init.gamma - 1.2) / 2.4); // gamma <- [1.2..3.6]
             tSlider.setValue(pow((init.temperature - 1000) / 19000, 0.5673756656029532)); // temperature <- [1000..20000]
@@ -299,6 +299,7 @@ namespace appui {
         padded<ui::grid> gammaGrid{{10, 10, 10, 10}, 2, 3};
         padded_label yLabel{{10, 10, 10, 10}, {L"\uf042", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
         padded_label tLabel{{10, 10, 10, 10}, {L"\uf2c9", ui::font::loadPermanently<IDI_FONT_ICONS>(), 22}};
+        padded_label mLabel{{10, 10, 10, 10}, {L"0", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>(), 22}};
         padded<ui::slider> ySlider{{10, 10, 10, 10}};
         padded<texslider<3>> tSlider{{10, 10, 10, 10}};
         padded<texslider<2>> mSlider{{10, 10, 10, 10}};
