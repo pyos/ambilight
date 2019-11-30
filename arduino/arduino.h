@@ -31,18 +31,16 @@ namespace {
         uint8_t Z, B, G, R;
 
         Y5B8G8R8() : Z(0xE0), B(0), G(0), R(0) {}
-        Y5B8G8R8(uint32_t r, uint32_t g, uint32_t b, uint16_t /*y*/) {
-            r *= 31, g *= 31, b *= 31;
+        Y5B8G8R8(uint16_t r, uint16_t g, uint16_t b, uint16_t /*y*/) {
+            auto m31d32 = [](uint16_t x) { return (x / 256 * 248) + (x % 256 * 31 / 32); };
             // APA102 has an effective 13 bit dynamic range thanks to its 5-bit global brightness
             // field. A lot of pairs in 1..32 are coprime, so picking the smallest possible
             // brightness is not always best; others may allow for colors closer to the desired one.
-            uint32_t d = 65536ul * 3;
-            for (int i = (r > b ? r > g ? r : g : b > g ? b : g) / 256 / 256 + 1; i < 32; i++) {
-                int rd = r / (i * 256), gd = g / (i * 256), bd = b / (i * 256),
-                    rm = r % (i * 256), gm = g % (i * 256), bm = b % (i * 256);
-                if (d > rm + gm + bm)
-                    d = rm + gm + bm, Z = 0xE0 | i, R = rd, G = gd, B = bd;
-            }
+            r = m31d32(r) / 8, g = m31d32(g) / 8, b = m31d32(b) / 8;
+            for (int d = 128, i = (r > b ? r > g ? r : g : b > g ? b : g) / 256 + 1; i < 32; i++)
+                if (d > r % i + g % i + b % i)
+                    d = r % i + g % i + b % i, Z = i;
+            R = r / Z, G = g / Z, B = b / Z, Z |= 0xE0;
         }
     };
 
