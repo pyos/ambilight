@@ -10,9 +10,9 @@ struct FLOATX4 {
     union { float b, v, z, _3; };
     union { float a,    w, _4; };
 
-    template <typename... Ts, typename F>
+    template <bool A = true, typename F, typename... Ts>
     FLOATX4 apply(F&& f, Ts&&... other) const {
-        return {f(r, other.r...), f(g, other.g...), f(b, other.b...), f(a, other.a...)};
+        return {f(r, other.r...), f(g, other.g...), f(b, other.b...), A ? f(a, other.a...) : a};
     }
 };
 

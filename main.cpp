@@ -318,16 +318,18 @@ namespace appui {
             , m_(musicLeds)
         {}
 
+        template <typename F /* = FLOATX4(FLOATX4) */>
         void setColors(const FLOATX4* bl /* w+h */, const FLOATX4* rt /* w+h */,
-                       const FLOATX4* ml /* m/2 */, const FLOATX4* mr /* m/2 */) {
+                       const FLOATX4* ml /* m/2 */, const FLOATX4* mr /* m/2 */, F&& transform) {
             // Order in `colors`: clockwise from top left, then music LEDs left to right.
             auto out = colors.data();
-            for (size_t x = w_; x--; ) *out++ = rt[x + h_];
-            for (size_t y = h_; y--; ) *out++ = rt[y];
-            for (size_t x = w_; x--; ) *out++ = *bl++;
-            for (size_t y = h_; y--; ) *out++ = *bl++;
-            for (size_t i = m_ / 2; i--; ) *out++ = ml[i];
-            for (size_t i = m_ / 2; i--; ) *out++ = *mr++;
+            auto t0 = transform(0), t1 = transform(1), t2 = transform(2), t3 = transform(3);
+            for (size_t x = w_; x--; ) *out++ = t1(rt[x + h_]);
+            for (size_t y = h_; y--; ) *out++ = t1(rt[y]);
+            for (size_t x = w_; x--; ) *out++ = t0(*bl++);
+            for (size_t y = h_; y--; ) *out++ = t0(*bl++);
+            for (size_t i = m_ / 2; i--; ) *out++ = t2(ml[i]);
+            for (size_t i = m_ / 2; i--; ) *out++ = t3(*mr++);
             invalidate();
         }
 
@@ -344,6 +346,7 @@ namespace appui {
         }
 
         static DirectX::XMFLOAT4 c2v(FLOATX4 c) {
+            c = c.apply<false>([](float x) { return powf(x / 65535, 1 / 2.4f); }); // Unapply gamma and scaling.
             // LEDs do not actually emit black, so move brightness to alpha.
             auto v = c.a ? (c.r > c.b ? c.r > c.g ? c.r : c.g : c.g > c.b ? c.g : c.b) / c.a : 0.f;
             return v ? DirectX::XMFLOAT4{c.r / v, c.g / v, c.b / v, c.a * v}
@@ -429,8 +432,9 @@ namespace appui {
             setPrimaryCell(0, 1);
         }
 
-        void setColors(const FLOATX4 *bl, const FLOATX4 *rt, const FLOATX4 *ml, const FLOATX4 *mr) {
-            render.setColors(bl, rt, ml, mr);
+        template <typename F /* = FLOATX4(FLOATX4) */>
+        void setColors(const FLOATX4 *bl, const FLOATX4 *rt, const FLOATX4 *ml, const FLOATX4 *mr, F&& transform) {
+            render.setColors(bl, rt, ml, mr, transform);
         }
 
     private:
@@ -499,12 +503,6 @@ int ui::main() {
     FLOATX4 frameData[4][AMBILIGHT_CHUNKS_PER_STRIP * AMBILIGHT_SERIAL_CHUNK] = {};
     FLOATX4 averageColor = u2qd(config.color);
     bool frameDirty = false;
-
-    mainWindow.onMessage.addForever([&](uintptr_t) {
-        if (previewing)
-            if (auto lk = std::unique_lock<std::mutex>(mut))
-                preview->setColors(frameData[0], frameData[1], frameData[2], frameData[3]);
-    });
 
     auto updateLocked = [&](auto&& unsafePart) {
         if (auto lk = std::unique_lock<std::mutex>(mut)) {
@@ -592,6 +590,22 @@ int ui::main() {
         }
     });
 
+    auto makeTransform = [&](uint8_t strip) {
+        auto gamma = config.gamma.load();
+        auto white = k2rgba((float)config.temperature.load());
+        auto lower = strip < 2 ? pow(config.minLevel, 1 / config.gamma) : 0;
+        auto upper = strip < 2 ? config.brightnessV.load() : config.brightnessA.load();
+        return [=](FLOATX4 color) {
+            return color.apply<false>([&](float x, float y) {
+                return 65535 * (float)pow((x * upper * (1 - lower) + lower) * y, gamma); }, white); };
+    };
+
+    mainWindow.onMessage.addForever([&](uintptr_t) {
+        if (previewing)
+            if (auto lk = std::unique_lock<std::mutex>(mut))
+                preview->setColors(frameData[0], frameData[1], frameData[2], frameData[3], makeTransform);
+    });
+
     auto serialThread = loopThread([&] {
         auto port = config.serial.load();
         auto filename = L"\\\\.\\COM" + std::to_wstring(port);
@@ -601,18 +615,8 @@ int ui::main() {
             // Ping the arduino at least once per ~2s so that it knows the app is still running.
             if (frameEv.wait_for(lock, std::chrono::seconds(2), [&]{ return frameDirty; })) {
                 frameDirty = false;
-                auto gamma = config.gamma.load();
-                auto white = k2rgba((float)config.temperature.load());
-                for (uint8_t strip = 0; strip < 4; strip++) {
-                    auto lower = strip < 2 ? pow(config.minLevel, 1 / config.gamma) : 0;
-                    auto upper = strip < 2 ? config.brightnessV.load() : config.brightnessA.load();
-                    comm.update(strip, frameData[strip], [&](FLOATX4 color) {
-                        color = color.apply([&](float x, float y) {
-                            return 65535 * (float)pow((x * upper * (1 - lower) + lower) * y, gamma); }, white);
-                        return LED((uint16_t)color.r, (uint16_t)color.g, (uint16_t)color.b,
-                                   (uint16_t)(0.299f * color.r + 0.587f * color.g + 0.114f * color.b));
-                    });
-                }
+                for (uint8_t strip = 0; strip < 4; strip++)
+                    comm.update(strip, frameData[strip], makeTransform(strip));
             }
             lock.unlock();
             comm.submit();

@@ -35,10 +35,13 @@ struct serial {
     template <typename F /* LED(FLOATX4) */>
     void update(uint8_t strip, util::span<const FLOATX4> data, F&& transform) {
         for (size_t i = 0; i < data.size(); i++) {
+            FLOATX4 asFloat = transform(data[i]);
             size_t chunk = i / AMBILIGHT_SERIAL_CHUNK;
             size_t place = i % AMBILIGHT_SERIAL_CHUNK;
             auto old = color[strip][chunk][place];
-            color[strip][chunk][place] = transform(data[i]);
+            color[strip][chunk][place] = LED(
+                (uint16_t)asFloat.r, (uint16_t)asFloat.g, (uint16_t)asFloat.b,
+                (uint16_t)(0.299f * asFloat.r + 0.587f * asFloat.g + 0.114f * asFloat.b));
             valid[strip][chunk] &= !memcmp(&old, &color[strip][chunk][place], sizeof(old));
         }
     }
