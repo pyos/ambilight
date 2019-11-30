@@ -21,16 +21,16 @@
 
 namespace appui {
     struct state {
-        std::atomic<size_t> width;
-        std::atomic<size_t> height;
-        std::atomic<size_t> musicLeds;
-        std::atomic<size_t> serial;
-        std::atomic<double> brightnessV;
-        std::atomic<double> brightnessA;
-        std::atomic<double> gamma;
-        std::atomic<double> temperature;
-        uint32_t color;
-        std::atomic<double> minLevel;
+        std::atomic<size_t> width{16};
+        std::atomic<size_t> height{9};
+        std::atomic<size_t> musicLeds{20};
+        std::atomic<size_t> serial{3};
+        std::atomic<double> brightnessV{.7};
+        std::atomic<double> brightnessA{.4};
+        std::atomic<double> gamma{2.0};
+        std::atomic<double> temperature{6600.};
+        uint32_t color{0x00FFFFFFu};
+        std::atomic<double> minLevel{0.};
     };
 
     template <typename T>
@@ -255,10 +255,10 @@ namespace appui {
                            &tLabel.pad, &tSlider.pad,
                            nullptr,     &mSlider.pad});
             gammaGrid.setColStretch(1, 1);
-            ySlider.setValue((init.gamma - 1) / 2); // gamma <- [1..3]
+            ySlider.setValue((init.gamma - 1.2) / 2.4); // gamma <- [1.2..3.6]
             tSlider.setValue(pow((init.temperature - 1000) / 19000, 0.5673756656029532)); // temperature <- [1000..20000]
             mSlider.setValue(init.minLevel * 32); // minLevel <- [0..32]
-            ySlider.onChange.addForever([&](double value) { return onChange(Y, value * 2 + 1); });
+            ySlider.onChange.addForever([&](double value) { return onChange(Y, value * 2.4 + 1.2); });
             tSlider.onChange.addForever([&](double value) { return onChange(T, pow(value, 1.7625006862733437) * 19000 + 1000); });
             mSlider.onChange.addForever([&](double value) { return onChange(Lm, value / 32); });
 
@@ -448,7 +448,6 @@ namespace appui {
 
 int ui::main() {
     bool initialized = false;
-    appui::state defaultConfig = {16, 9, 20, 3, 0.7, 0.4, 2.0, 6600.0, 0x00FFFFFFu};
     appui::state config;
 
     wchar_t configPath[MAX_PATH];
@@ -463,6 +462,7 @@ int ui::main() {
         winapi::throwOnFalse(ReadFile(file.get(), &config, sizeof(config), &result, nullptr));
         initialized = true;
     } catch (const std::exception&) {
+        appui::state defaultConfig;
         memcpy(&config, &defaultConfig, sizeof(config));
     }
 
