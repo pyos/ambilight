@@ -14,9 +14,8 @@
 //
 // If incorrect serial data is received, or any data takes more than a second to arrive,
 // the Arduino will blink its integrated LED. If no data at all (not even incorrect data
-// is received for 4 seconds in a row, all strips will be turned off and strips 2 and 3
-// will display a dim red light on the first LEDs. To keep the same state, periodic
-// empty transactions can be used.
+// is received for 4 seconds in a row, all strips will only display a dim red light on
+// the first LED. To keep the same state, periodic empty transactions can be used.
 
 #include "arduino.h"
 
@@ -137,23 +136,26 @@ static bool valid = false;
 static LEDStripPair strip01{9,  10, AMBILIGHT_USE_SPI ? 5  : -1};
 static LEDStripPair strip23{11, 12, AMBILIGHT_USE_SPI ? 13 : -1};
 
+void fallbackPattern() {
+  // TODO there's 256 bytes in EEPROM, maybe store a simple default pattern there?
+  for (auto& strip : data) for (auto& chunk : strip) for (auto& led : chunk) led = LED();
+  for (auto& strip : data) strip[0][0] = {10 << 8, 0, 0, 3 << 8};
+  strip01.show((const uint8_t*)data[0], (const uint8_t*)data[1], CHUNK_BYTE_SIZE * AMBILIGHT_CHUNKS_PER_STRIP);
+  strip23.show((const uint8_t*)data[2], (const uint8_t*)data[3], CHUNK_BYTE_SIZE * AMBILIGHT_CHUNKS_PER_STRIP);
+  valid = false;
+}
+
 void setup() {
+  fallbackPattern();
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(AMBILIGHT_SERIAL_BAUD_RATE);
   while (!Serial);
 }
 
 void loop() {
-  for (uint8_t i = 1; !Serial.find("<RGBDATA"); i++) {
-    if (i % 4 /* seconds */ == 0) {
-      // TODO there's 256 bytes in EEPROM, maybe store a simple default pattern there?
-      for (auto& strip : data) for (auto& chunk : strip) for (auto& led : chunk) led = LED();
-      data[2][0][0] = data[3][0][0] = LED(10 << 8, 0, 0, 3 << 8);
-      strip01.show((const uint8_t*)data[0], (const uint8_t*)data[1], CHUNK_BYTE_SIZE * AMBILIGHT_CHUNKS_PER_STRIP);
-      strip23.show((const uint8_t*)data[2], (const uint8_t*)data[3], CHUNK_BYTE_SIZE * AMBILIGHT_CHUNKS_PER_STRIP);
-      valid = false;
-    }
-  }
+  for (uint8_t i = 1; !Serial.find("<RGBDATA"); i++)
+    if (i == 4 /* seconds */)
+      fallbackPattern();
 
   uint8_t index;
   uint8_t ns[] = {0, 0};
