@@ -46,13 +46,8 @@ struct serial {
         }
     }
 
-    void submit() {
-        if (!submit(false)) while (!submit(true)) {}
-    }
-
-private:
-    bool submit(bool force) {
-        write({'<', 'R', 'G', 'B', 'D', 'A', 'T', 'A'});
+    bool submit() {
+        bool force = !write({'<', 'R', 'G', 'B', 'D', 'A', 'T', 'A'});
         for (size_t strip = 0; strip < 4; strip++) {
             for (size_t chunk = 0; chunk < AMBILIGHT_CHUNKS_PER_STRIP; chunk++) if (force || !valid[strip][chunk]) {
                 uint8_t tmpb[AMBILIGHT_SERIAL_CHUNK * sizeof(LED) + 1];
@@ -62,9 +57,10 @@ private:
                 valid[strip][chunk] = true;
             }
         }
-        return write({255});
+        write({255});
     }
 
+private:
     bool write(util::span<const uint8_t> data) {
         BYTE response;
         DWORD result = (DWORD)data.size();

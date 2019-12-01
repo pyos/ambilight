@@ -1,31 +1,22 @@
+// A general Arduino program to control up to 4 strips of WS2812B-like or APA102-like
+// LEDs each over the serial interface.
 //
-// A general Arduino program to control up to 4 strips of up to AMBILIGHT_CHUNKS_PER_STRIP
-// times AMBILIGHT_SERIAL_CHUNK (default = 120) WS2815 LEDs each over the serial interface.
+// The data consists of transactions, each a series of request-response pairs. The first
+// request is always "<RGBDATA"; the response is ">" if there is a known last state, "<"
+// if a complete frame is needed. After that, new LED data may follow in chunks of
+// AMBILIGHT_SERIAL_CHUNK * sizeof(LED) bytes, prefixed with a (chunk index * 4 + strip
+// index) byte. The last request should be 255, which refreshes all LEDs updated in
+// this transaction. Requests starting with bytes 252, 253, and 254 are reserved.
 //
-// The data consists of transactions, each a series of request-response pairs.
-// The first request must always be "<RGBDATA", and the response is ">".
-// Requests after that update the LED data: the first byte, 0..251 = (chunk index
-// * 4 + strip index), is followed by AMBILIGHT_SERIAL_CHUNK * sizeof(LED) bytes
-// of data. The response to these requests is, again, always ">". The last request
-// is a flush:
-//    * 252, 253, and 254 are reserved;
-//    * 255 forces an update of the LED strips. If the response is ">", the strips
-//      are refreshed; if it is "<", there was no previous state, so the refresh
-//      is not done and the next update is expected to send the entire state
-//      of the strips.
+// Strips are driven in pairs (0+1 and 2+3), so the total refresh time depends on the
+// maximum number of LEDs updated in the strips of each pair. For WS2812B-like LEDs,
+// each pair of LEDs takes 27.9us to refresh.
 //
-// Strips are driven in pairs (0+1 and 2+3), so total refresh time is 27.9us times
-// [the maximum number of updated LEDs in strips 0 and 1 rounded up to chunk size,
-// plus the maximum number of updated LEDs in strips 2 and 3 rounded up to chunk size].
-// For example, if first 25 LEDs of strip 0, 30 LEDs of strip 1, and 10 LEDs of strip 2
-// are updated during a single exhange, the refresh time with default chunk size will be
-// (40 + 20) * 27.9us = 1.674ms.
-//
-// NOTE  If incorrect serial data is received, or any data takes more than a second to
-//       arrive, the Arduino will blink its integrated LED. If no data at all (not even
-//       incorrect data) is received for 4 seconds in a row, all strips will be turned
-//       off and strips 2 and 3 will display a dim red light on the first LEDs.
-//
+// If incorrect serial data is received, or any data takes more than a second to arrive,
+// the Arduino will blink its integrated LED. If no data at all (not even incorrect data
+// is received for 4 seconds in a row, all strips will be turned off and strips 2 and 3
+// will display a dim red light on the first LEDs. To keep the same state, periodic
+// empty transactions can be used.
 
 #include "arduino.h"
 
@@ -142,6 +133,7 @@ static constexpr size_t CHUNK_BYTE_SIZE = AMBILIGHT_SERIAL_CHUNK * sizeof(LED);
 static LED data[4][AMBILIGHT_CHUNKS_PER_STRIP][AMBILIGHT_SERIAL_CHUNK];
 static bool valid = false;
 
+// TODO allow strips of different kinds & select strip kind at runtime
 static LEDStripPair strip01{9,  10, AMBILIGHT_USE_SPI ? 5  : -1};
 static LEDStripPair strip23{11, 12, AMBILIGHT_USE_SPI ? 13 : -1};
 
@@ -162,18 +154,15 @@ void loop() {
       valid = false;
     }
   }
+
   uint8_t index;
   uint8_t ns[] = {0, 0};
-  while (Serial.write('>') && Serial.readBytes(&index, 1) == 1) {
+  while (Serial.write(valid ? '>' : '<') && Serial.readBytes(&index, 1) == 1) {
+    valid = true;
     if (index == 255) {
-      if (valid) {
-        strip01.show((const uint8_t*)data[0], (const uint8_t*)data[1], CHUNK_BYTE_SIZE * ns[0]);
-        strip23.show((const uint8_t*)data[2], (const uint8_t*)data[3], CHUNK_BYTE_SIZE * ns[1]);
-        Serial.write('>');
-      } else {
-        Serial.write('<');
-        valid = true;
-      }
+      strip01.show((const uint8_t*)data[0], (const uint8_t*)data[1], CHUNK_BYTE_SIZE * ns[0]);
+      strip23.show((const uint8_t*)data[2], (const uint8_t*)data[3], CHUNK_BYTE_SIZE * ns[1]);
+      Serial.write('>');
       return;
     }
 
