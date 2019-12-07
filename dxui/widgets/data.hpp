@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../span.hpp"
+#include <algorithm>
 #include <cctype>
 
 namespace ui {
