@@ -46,7 +46,7 @@ struct serial {
         }
     }
 
-    bool submit() {
+    void submit() {
         bool force = !write({'<', 'R', 'G', 'B', 'D', 'A', 'T', 'A'});
         for (size_t strip = 0; strip < 4; strip++) {
             for (size_t chunk = 0; chunk < AMBILIGHT_CHUNKS_PER_STRIP; chunk++) if (force || !valid[strip][chunk]) {
