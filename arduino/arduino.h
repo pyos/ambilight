@@ -19,12 +19,6 @@
 #define AMBILIGHT_CHUNKS_PER_STRIP 10
 #endif
 
-#ifndef AMBILIGHT_USE_SPI
-// Set to 1 for SK9822 strips, or 0 for WS2815 strips.
-// TODO move to runtime configuration
-#define AMBILIGHT_USE_SPI 1
-#endif
-
 static_assert(AMBILIGHT_CHUNKS_PER_STRIP < 63, "exceeding protocol limitations");
 static_assert(AMBILIGHT_SERIAL_CHUNK < 63, "chunk size too big");
 static constexpr uint32_t MAX_LEDS = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP / 4;

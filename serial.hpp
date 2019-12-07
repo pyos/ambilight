@@ -38,6 +38,18 @@ namespace {
     };
 }
 
+using led_encoder = size_t(size_t, FLOATX4, void*);
+
+template <typename LED>
+static size_t encodeLED(size_t index, FLOATX4 c, void* out) {
+    static_assert(AMBILIGHT_SERIAL_CHUNK % sizeof(LED) == 0, "a chunk does not fit a whole number of LEDs");
+    auto old = ((LED*)out)[index];
+    ((LED*)out)[index] = {
+        (uint16_t)c.r, (uint16_t)c.g, (uint16_t)c.b,
+        (uint16_t)(0.299f * c.r + 0.587f * c.g + 0.114f * c.b)};
+    return memcmp(&old, (LED*)out + index, sizeof(LED)) ? index * sizeof(LED) / AMBILIGHT_SERIAL_CHUNK + 1 : 0;
+}
+
 struct serial {
     serial(LPCWSTR path) {
         handle.reset(CreateFile(path, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0));
@@ -65,21 +77,14 @@ struct serial {
         winapi::throwOnFalse(PurgeComm(handle.get(), PURGE_RXCLEAR | PURGE_TXCLEAR));
     }
 
-    template <typename F /* FLOATX4(FLOATX4) */>
-    void update(uint8_t strip, util::span<const FLOATX4> data, F&& transform) {
-        for (size_t i = 0; i < data.size(); i++) {
-            FLOATX4 asFloat = transform(data[i]);
-            size_t chunk = i / ledsPerChunk;
-            size_t place = i % ledsPerChunk;
-            auto old = color[strip][chunk][place];
-            color[strip][chunk][place] = {
-                (uint16_t)asFloat.r, (uint16_t)asFloat.g, (uint16_t)asFloat.b,
-                (uint16_t)(0.299f * asFloat.r + 0.587f * asFloat.g + 0.114f * asFloat.b)};
-            valid[strip][chunk] &= !memcmp(&old, &color[strip][chunk][place], sizeof(old));
-        }
+    template <typename F /* = FLOATX4(FLOATX4) */>
+    void update(uint8_t strip, util::span<const FLOATX4> data, F&& transform, led_encoder* encode) {
+        for (size_t i = 0; i < data.size(); i++)
+            if (auto j = encode(i, transform(data[i]), color[strip][0]))
+                valid[strip][j - 1] = false;
     }
 
-    void submit() {
+    void submit(bool spi) {
         bool force = !write({'<', 'R', 'G', 'B', 'D', 'A', 'T', 'A'});
         for (size_t strip = 0; strip < 4; strip++) {
             for (size_t chunk = 0; chunk < AMBILIGHT_CHUNKS_PER_STRIP; chunk++) if (force || !valid[strip][chunk]) {
@@ -90,7 +95,7 @@ struct serial {
                 valid[strip][chunk] = true;
             }
         }
-        write({AMBILIGHT_USE_SPI ? 254 : 255});
+        write({(uint8_t)(spi ? 254 : 255)});
     }
 
 private:
@@ -103,11 +108,7 @@ private:
     }
 
 private:
-    using LED = std::conditional_t<AMBILIGHT_USE_SPI, Y5B8G8R8, G8R8B8>;
-    static_assert(AMBILIGHT_SERIAL_CHUNK % sizeof(LED) == 0, "a chunk does not fit a whole number of LEDs");
-    static constexpr size_t ledsPerChunk = AMBILIGHT_SERIAL_CHUNK / sizeof(LED);
-
     winapi::handle handle;
-    LED  color[4][AMBILIGHT_CHUNKS_PER_STRIP][ledsPerChunk] = {};
-    bool valid[4][AMBILIGHT_CHUNKS_PER_STRIP] = {};
+    uint8_t color[4][AMBILIGHT_CHUNKS_PER_STRIP][AMBILIGHT_SERIAL_CHUNK] = {};
+    bool    valid[4][AMBILIGHT_CHUNKS_PER_STRIP] = {};
 };

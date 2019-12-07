@@ -2,6 +2,7 @@
 #include "dxui/resource.hpp"
 #include "dxui/window.hpp"
 #include "dxui/widgets/button.hpp"
+#include "dxui/widgets/checkbox.hpp"
 #include "dxui/widgets/grid.hpp"
 #include "dxui/widgets/label.hpp"
 #include "dxui/widgets/slider.hpp"
@@ -23,16 +24,17 @@
 namespace appui {
     #define CONFIG_NOP(x) x
     #define CONFIG_MAP(f, ...) \
-        CONFIG_NOP(f(uint32_t, width,       16         , __VA_ARGS__)); \
-        CONFIG_NOP(f(uint32_t, height,      9          , __VA_ARGS__)); \
-        CONFIG_NOP(f(uint32_t, musicLeds,   20         , __VA_ARGS__)); \
-        CONFIG_NOP(f(uint32_t, serial,      3          , __VA_ARGS__)); \
+        CONFIG_NOP(f(uint32_t, width,       16,          __VA_ARGS__)); \
+        CONFIG_NOP(f(uint32_t, height,      9,           __VA_ARGS__)); \
+        CONFIG_NOP(f(uint32_t, musicLeds,   20,          __VA_ARGS__)); \
+        CONFIG_NOP(f(uint32_t, serial,      3,           __VA_ARGS__)); \
         CONFIG_NOP(f(uint32_t, color,       0x00FFFFFFu, __VA_ARGS__)); \
-        CONFIG_NOP(f(double,   brightnessV, .7         , __VA_ARGS__)); \
-        CONFIG_NOP(f(double,   brightnessA, .4         , __VA_ARGS__)); \
-        CONFIG_NOP(f(double,   gamma,       2.         , __VA_ARGS__)); \
-        CONFIG_NOP(f(double,   temperature, 6600.      , __VA_ARGS__)); \
-        CONFIG_NOP(f(double,   minLevel,    0.         , __VA_ARGS__));
+        CONFIG_NOP(f(bool,     spiStrips,   0,           __VA_ARGS__)); \
+        CONFIG_NOP(f(double,   brightnessV, .7,          __VA_ARGS__)); \
+        CONFIG_NOP(f(double,   brightnessA, .4,          __VA_ARGS__)); \
+        CONFIG_NOP(f(double,   gamma,       2.,          __VA_ARGS__)); \
+        CONFIG_NOP(f(double,   temperature, 6600.,       __VA_ARGS__)); \
+        CONFIG_NOP(f(double,   minLevel,    0.,          __VA_ARGS__));
     #define CONFIG_DECLARE(T, name, default, wrapper) wrapper<T> name{default}
 
     struct state { CONFIG_MAP(CONFIG_DECLARE, std::atomic) };
@@ -159,7 +161,15 @@ namespace appui {
             setPrimaryCell(0, 0);
             sliderGrid.set(4, 3, &constNumWidth);
             sliderGrid.setColStretch(2, 1);
-            bottomRow.set(5, 0, &done);
+            spiGrid.set({&spiCheckbox, &spiLabel.pad});
+            spiGrid.setTarget(&spiCheckbox);
+            spiCheckbox.setState(init.spiStrips ? ui::checkbox::checked : ui::checkbox::unchecked);
+            spiCheckbox.onClick.addForever([&]{
+                bool newState = spiCheckbox.state() != ui::checkbox::checked;
+                spiCheckbox.setState(newState ? ui::checkbox::checked : ui::checkbox::unchecked);
+                return onChange(4, newState); });
+            bottomRow.set(5, 0, &spiGrid);
+            bottomRow.set(6, 0, &done);
             bottomRow.setColStretch(4, 1);
             w.setValue(init.width);
             h.setValue(init.height);
@@ -177,7 +187,7 @@ namespace appui {
         }
 
     public:
-        // 0 = width, 1 = height, 2 = music leds, 3 = serial port
+        // 0 = width, 1 = height, 2 = music leds, 3 = serial port, 4 = SPI
         util::event<int /* parameter */, uint32_t /* new value */> onChange;
 
     private:
@@ -185,9 +195,12 @@ namespace appui {
         padded_label helpLabel{{40, 0, 40, 0}, {L"Tweak the values until you get the pattern shown above.",
                                                 ui::font::loadPermanently<IDI_FONT_SEGOE_UI>(), 22}};
         padded_label doneLabel{{20, 0, 20, 0}, {L"Done", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}};
+        padded_label spiLabel{{10, 0, 30, 0}, {L"APA102 strips", ui::font::loadPermanently<IDI_FONT_SEGOE_UI>()}};
         padded<ui::grid> sliderGrid{{40, 40, 40, 40}, 5, 4};
-        padded<ui::grid> bottomRow{{40, 40, 40, 40}, 6, 1};
+        padded<ui::grid> bottomRow{{40, 40, 40, 40}, 7, 1};
         ui::button done{doneLabel.pad};
+        ui::buttonlike<ui::grid> spiGrid{2, 1};
+        ui::checkbox spiCheckbox;
         controlled_number w{sliderGrid, 0, L"Screen width",  1, MAX_LEDS * 4 / 5, 1, true};
         controlled_number h{sliderGrid, 1, L"Screen height", 1, MAX_LEDS * 4 / 5, 1, true};
         controlled_number e{sliderGrid, 2, L"Music LEDs",    2, MAX_LEDS, 2, true};
@@ -615,10 +628,11 @@ int ui::main() {
             if (frameEv.wait_for(lock, std::chrono::seconds(2), [&]{ return frameDirty; })) {
                 frameDirty = false;
                 for (uint8_t strip = 0; strip < 4; strip++)
-                    comm.update(strip, frameData[strip], makeTransform(strip));
+                    comm.update(strip, frameData[strip], makeTransform(strip),
+                        config.spiStrips ? &encodeLED<Y5B8G8R8> : &encodeLED<G8R8B8>);
             }
             lock.unlock();
-            comm.submit();
+            comm.submit(config.spiStrips);
         }
     });
 
@@ -720,6 +734,7 @@ int ui::main() {
             case 1: config.height = value; break;
             case 2: config.musicLeds = value; break;
             case 3: config.serial = value; break;
+            case 4: config.spiStrips = value; break;
         }
         setTestPattern();
     });
