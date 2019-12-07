@@ -21,7 +21,7 @@ How to
 
  1. Configure the Arduino IDE to flash the Nano Every to 20MHz mode:
     in boards.txt, set `nona4809.build.f_cpu=20000000L` and `nona4809.bootloader.OSCCFG=0x02`.
- 2. In `arduino/config.h`, set `AMBILIGHT_USE_SPI` to 1 to use APA102 strips.
+ 2. In `arduino/arduino.h`, set `AMBILIGHT_USE_SPI` to 1 to use APA102 strips.
  3. Connect strips to the Arduino:
    * pin 9 = control for bottom and left edges, starting from rightmost LED on the bottom;
    * pin 10 = control for right and top edges, starting from lowest LED on the right;
