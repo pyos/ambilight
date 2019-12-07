@@ -166,10 +166,10 @@ namespace appui {
             e.setValue(init.musicLeds);
             s.setValue(init.serial);
             w.onChange.addForever([this](uint32_t v) {
-                w.setValue(v = std::min(v, LIMIT - h.value()));
+                w.setValue(v = std::min(v, MAX_LEDS - h.value()));
                 return onChange(0, v); });
             h.onChange.addForever([this](uint32_t v) {
-                h.setValue(v = std::min(v, LIMIT - w.value()));
+                h.setValue(v = std::min(v, MAX_LEDS - w.value()));
                 return onChange(1, v); });
             e.onChange.addForever([this](uint32_t v) { return onChange(2, v); });
             s.onChange.addForever([this](uint32_t v) { return onChange(3, v); });
@@ -188,10 +188,9 @@ namespace appui {
         padded<ui::grid> sliderGrid{{40, 40, 40, 40}, 5, 4};
         padded<ui::grid> bottomRow{{40, 40, 40, 40}, 6, 1};
         ui::button done{doneLabel.pad};
-        static constexpr uint32_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
-        controlled_number w{sliderGrid, 0, L"Screen width",  1, LIMIT * 4 / 5, 1, true};
-        controlled_number h{sliderGrid, 1, L"Screen height", 1, LIMIT * 4 / 5, 1, true};
-        controlled_number e{sliderGrid, 2, L"Music LEDs",    2, LIMIT, 2, true};
+        controlled_number w{sliderGrid, 0, L"Screen width",  1, MAX_LEDS * 4 / 5, 1, true};
+        controlled_number h{sliderGrid, 1, L"Screen height", 1, MAX_LEDS * 4 / 5, 1, true};
+        controlled_number e{sliderGrid, 2, L"Music LEDs",    2, MAX_LEDS, 2, true};
         controlled_number s{bottomRow,  0, L"Serial port",   1, 16, 1};
         // A hacky way to set a constant size for the number labels:
         ui::spacer constNumWidth{{60, 1}};
@@ -500,7 +499,7 @@ int ui::main() {
     // NOTE: deadlock-avoiding resource hierarchy: `videoLock`, then `audioLock`, then `mut`.
     std::mutex mut;
     std::condition_variable frameEv;
-    FLOATX4 frameData[4][AMBILIGHT_CHUNKS_PER_STRIP * AMBILIGHT_SERIAL_CHUNK] = {};
+    FLOATX4 frameData[4][MAX_LEDS] = {};
     FLOATX4 averageColor = u2qd(config.color);
     bool frameDirty = false;
 

@@ -4,9 +4,10 @@
 // The data consists of transactions, each a series of request-response pairs. The first
 // request is always "<RGBDATA"; the response is ">" if there is a known last state, "<"
 // if a complete frame is needed. After that, new LED data may follow in chunks of
-// AMBILIGHT_SERIAL_CHUNK * sizeof(LED) bytes, prefixed with a (chunk index * 4 + strip
-// index) byte. The last request should be 255, which refreshes all LEDs updated in
-// this transaction. Requests starting with bytes 252, 253, and 254 are reserved.
+// AMBILIGHT_SERIAL_CHUNK bytes, prefixed with a (chunk index * 4 + strip index) byte.
+// The last request should be 254 (for SPI strips) or 255 (for WS281x strips), which
+// refreshes all LEDs updated in this transaction. Requests starting with bytes 252 and
+// 253 are reserved.
 //
 // Strips are driven in pairs (0+1 and 2+3), so the total refresh time depends on the
 // maximum number of LEDs updated in the strips of each pair. For WS2812B-like LEDs,
@@ -34,16 +35,15 @@ struct LEDStripPair {
     port->OUTCLR = maskA | maskB | maskC;
   }
 
-  void show(const uint8_t* A, const uint8_t* B, size_t n) {
+  void show(const uint8_t* A, const uint8_t* B, size_t n, bool spi) {
     if (!n) return;
-    if (maskC) showSPI(A, B, n); else showTimed(A, B, n);
+    if (spi) showSPI(A, B, n); else showTimed(A, B, n);
+    endTime = micros() / 256;
   }
 
 private:
   void showTimed(const uint8_t* A, const uint8_t* B, size_t n) {
-    // Truncating `micros()` is fine; at worst, this causes a redundant
-    // delay once in a while.
-    while ((uint16_t)micros() - endTime < 200);
+    while ((uint16_t)(micros() / 256) == endTime);
     uint8_t a = 0, b = 0, z = 0, m = 8;
     __asm__ volatile (
       "cli"               "\n" // /--------------------- cycles (1 cycle = 50 ns)
@@ -91,7 +91,6 @@ private:
       , [mB]  "la" (maskB)
       , [mAB] "la" (maskA | maskB)
     );
-    endTime = micros();
   }
 
   void showSPI(const uint8_t* A, const uint8_t* B, size_t n) {
@@ -128,20 +127,21 @@ private:
   uint16_t endTime = 0;
 };
 
-static constexpr size_t CHUNK_BYTE_SIZE = AMBILIGHT_SERIAL_CHUNK * sizeof(LED);
-static LED data[4][AMBILIGHT_CHUNKS_PER_STRIP][AMBILIGHT_SERIAL_CHUNK];
+// TODO allow strips of different kinds & select strip kind at runtime
+static LEDStripPair strip01{ 9, 10,  5};
+static LEDStripPair strip23{11, 12, 13};
+static uint8_t data[4][AMBILIGHT_CHUNKS_PER_STRIP][AMBILIGHT_SERIAL_CHUNK];
 static bool valid = false;
 
-// TODO allow strips of different kinds & select strip kind at runtime
-static LEDStripPair strip01{9,  10, AMBILIGHT_USE_SPI ? 5  : -1};
-static LEDStripPair strip23{11, 12, AMBILIGHT_USE_SPI ? 13 : -1};
-
-void fallbackPattern() {
-  // TODO there's 256 bytes in EEPROM, maybe store a simple default pattern there?
-  for (auto& strip : data) for (auto& chunk : strip) for (auto& led : chunk) led = LED();
-  for (auto& strip : data) strip[0][0] = {10 << 8, 0, 0, 3 << 8};
-  strip01.show((const uint8_t*)data[0], (const uint8_t*)data[1], CHUNK_BYTE_SIZE * AMBILIGHT_CHUNKS_PER_STRIP);
-  strip23.show((const uint8_t*)data[2], (const uint8_t*)data[3], CHUNK_BYTE_SIZE * AMBILIGHT_CHUNKS_PER_STRIP);
+static void fallbackPattern() {
+  memset(data, 0, sizeof(data));
+  // data = {SPI 0/1, SPI 2/3, WS281x 0/1, WS281x 2/3}
+  for (auto& chunk : data[0]) for (size_t i = 0; i < AMBILIGHT_SERIAL_CHUNK; i += 4) chunk[i] = 0xE0;
+  for (auto& chunk : data[1]) for (size_t i = 0; i < AMBILIGHT_SERIAL_CHUNK; i += 4) chunk[i] = 0xE0;
+  data[0][0][0] /* APA102 Y */ = 0xFF;
+  data[1][0][3] /* APA102 R */ = data[3][0][1] /* WS2812B R */ = 10;
+  // Show using SPI first because the timed data will be ignored by SPI strips.
+  for (int i = 0; i < 4; i++) (i & 1 ? strip23 : strip01).show(data[i][0], data[i][0], sizeof(data[i]), i < 2);
   valid = false;
 }
 
@@ -161,16 +161,16 @@ void loop() {
   uint8_t ns[] = {0, 0};
   while (Serial.write(valid ? '>' : '<') && Serial.readBytes(&index, 1) == 1) {
     valid = true;
-    if (index == 255) {
-      strip01.show((const uint8_t*)data[0], (const uint8_t*)data[1], CHUNK_BYTE_SIZE * ns[0]);
-      strip23.show((const uint8_t*)data[2], (const uint8_t*)data[3], CHUNK_BYTE_SIZE * ns[1]);
+    if (index == 254 || index == 255) {
+      strip01.show(data[0][0], data[1][0], sizeof(data[0][0]) * ns[0], index == 254);
+      strip23.show(data[2][0], data[3][0], sizeof(data[2][0]) * ns[1], index == 254);
       Serial.write('>');
       return;
     }
 
     uint8_t i = index % 4;
     uint8_t j = index / 4;
-    if (j >= AMBILIGHT_CHUNKS_PER_STRIP || Serial.readBytes((uint8_t*)data[i][j], CHUNK_BYTE_SIZE) != CHUNK_BYTE_SIZE)
+    if (j >= AMBILIGHT_CHUNKS_PER_STRIP || Serial.readBytes(data[i][j], sizeof(data[i][j])) != sizeof(data[i][j]))
       break;
     if (ns[i / 2] <= j)
       ns[i / 2] = j + 1;
