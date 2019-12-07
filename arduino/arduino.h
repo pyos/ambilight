@@ -37,7 +37,7 @@ namespace {
             // field. A lot of pairs in 1..32 are coprime, so picking the smallest possible
             // brightness is not always best; others may allow for colors closer to the desired one.
             r = m31d32(r) / 8, g = m31d32(g) / 8, b = m31d32(b) / 8;
-            for (uint16_t d = 128, i = (r > b ? r > g ? r : g : b > g ? b : g) / 256 + 1; i < 32; i++)
+            for (uint8_t d = 255, i = (r > b ? r > g ? r : g : b > g ? b : g) / 256 + 1; i < 32; i++)
                 if (d > r % i + g % i + b % i)
                     d = r % i + g % i + b % i, Z = i;
             R = r / Z, G = g / Z, B = b / Z, Z |= 0xE0;

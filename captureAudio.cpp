@@ -70,10 +70,10 @@ struct AudioOutputCapturer : IAudioCapturer, private IMMNotificationClient {
         for (auto& sv : samples)
             sv.resize(n);
         // Output range: [0, DFT_RESOLUTION, DFT_RESOLUTION*2, ..., Nyquist frequency].
-        fft.reset(kiss_fftr_alloc(n, 0, nullptr, nullptr));
+        fft.reset(kiss_fftr_alloc((int)n, 0, nullptr, nullptr));
         fftBuffer.resize(n / 2 + 1);
         // Discard 0 Hz, group the rest into octaves. First half is left channel, second half is right channel.
-        mapped.resize(log2fp1(n / 2) * ARRAYSIZE(samples));
+        mapped.resize(log2fp1((DWORD)(n / 2)) * ARRAYSIZE(samples));
 
         winapi::throwOnFalse(audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED,
             AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 0, 0, formatPtr, NULL));
@@ -136,7 +136,7 @@ private:
         kiss_fftr(fft.get(), in.data(), fftBuffer.data());
         for (size_t i = 1, j = 0; j < out.size(); j++) {
             float m = 0;
-            for (size_t q = 1 << j, d = 0; q-- && i < fftBuffer.size(); i++)
+            for (size_t q = 1ull << j, d = 0; q-- && i < fftBuffer.size(); i++)
                 m += (sqrtf(fftBuffer[i].r * fftBuffer[i].r + fftBuffer[i].i * fftBuffer[i].i) - m) / ++d;
             out[j] = (out[j] - m) * (m > out[j] ? DFT_EWMA_RISE : DFT_EWMA_DROP) + m;
         }
@@ -169,7 +169,7 @@ private:
     std::atomic<bool> deviceChanged{false};
     AudioSampleReader* reader = nullptr;
     WAVEFORMATEX format;
-    UINT nextSample = 0;
+    size_t nextSample = 0;
 };
 
 std::unique_ptr<IAudioCapturer> captureDefaultAudioOutput() {

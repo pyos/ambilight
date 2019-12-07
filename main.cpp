@@ -543,8 +543,8 @@ int ui::main() {
     auto videoCaptureThread = loopThread([&] {
         // Wait until the main thread allows capture threads to proceed.
         { std::unique_lock<std::timed_mutex> lk(videoMutex); };
-        size_t w = config.width;
-        size_t h = config.height;
+        uint32_t w = config.width;
+        uint32_t h = config.height;
         auto cap = captureScreen(0, w, h);
         while (!terminate) if (auto in = cap->next()) {
             FLOATX4 sum = {0, 0, 0, 0};
