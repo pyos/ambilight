@@ -16,22 +16,26 @@
 
 #include <atomic>
 #include <string>
+#include <fstream>
 #include <condition_variable>
 #include <mutex>
 
 namespace appui {
-    struct state {
-        std::atomic<size_t> width{16};
-        std::atomic<size_t> height{9};
-        std::atomic<size_t> musicLeds{20};
-        std::atomic<size_t> serial{3};
-        std::atomic<double> brightnessV{.7};
-        std::atomic<double> brightnessA{.4};
-        std::atomic<double> gamma{2.0};
-        std::atomic<double> temperature{6600.};
-        uint32_t color{0x00FFFFFFu};
-        std::atomic<double> minLevel{0.};
-    };
+    #define CONFIG_NOP(x) x
+    #define CONFIG_MAP(f, ...) \
+        CONFIG_NOP(f(uint32_t, width,       16         , __VA_ARGS__)); \
+        CONFIG_NOP(f(uint32_t, height,      9          , __VA_ARGS__)); \
+        CONFIG_NOP(f(uint32_t, musicLeds,   20         , __VA_ARGS__)); \
+        CONFIG_NOP(f(uint32_t, serial,      3          , __VA_ARGS__)); \
+        CONFIG_NOP(f(uint32_t, color,       0x00FFFFFFu, __VA_ARGS__)); \
+        CONFIG_NOP(f(double,   brightnessV, .7         , __VA_ARGS__)); \
+        CONFIG_NOP(f(double,   brightnessA, .4         , __VA_ARGS__)); \
+        CONFIG_NOP(f(double,   gamma,       2.         , __VA_ARGS__)); \
+        CONFIG_NOP(f(double,   temperature, 6600.      , __VA_ARGS__)); \
+        CONFIG_NOP(f(double,   minLevel,    0.         , __VA_ARGS__));
+    #define CONFIG_DECLARE(T, name, default, wrapper) wrapper<T> name{default}
+
+    struct state { CONFIG_MAP(CONFIG_DECLARE, std::atomic) };
 
     template <typename T>
     struct padded : T {
@@ -54,7 +58,7 @@ namespace appui {
     // name [-] ---|----------- [+] N
     struct controlled_number {
         controlled_number(ui::grid& grid, size_t row, util::span<const wchar_t> name,
-                          size_t min, size_t max, size_t step, bool useSlider = false)
+                          uint32_t min, uint32_t max, uint32_t step, bool useSlider = false)
             : min(min), max(max), step(step)
         {
             label.modText([&](auto& chunks) { chunks[0].data = name; });
@@ -72,21 +76,21 @@ namespace appui {
             slider.onChange.addForever([=](double) { setValue(value()); return onChange(value()); });
         }
 
-        size_t value() const {
+        uint32_t value() const {
             return slider.mapValue(min, max, step);
         }
 
-        void setValue(size_t v) {
+        void setValue(uint32_t v) {
             slider.setValue(v, min, max, step);
             numBuffer = std::to_wstring(v);
             numLabel.modText([&](auto& chunks) { chunks[0].data = numBuffer; });
         }
 
     public:
-        util::event<size_t> onChange;
+        util::event<uint32_t> onChange;
 
     private:
-        size_t min, max, step;
+        uint32_t min, max, step;
         ui::label label{{{L"", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
         ui::label numLabel{{{L"", ui::font::loadPermanently<IDI_FONT_SEGOE_UI_BOLD>()}}};
         ui::label decLabel{{{L"\uf068", ui::font::loadPermanently<IDI_FONT_ICONS>()}}};
@@ -161,20 +165,20 @@ namespace appui {
             h.setValue(init.height);
             e.setValue(init.musicLeds);
             s.setValue(init.serial);
-            w.onChange.addForever([this](size_t v) {
+            w.onChange.addForever([this](uint32_t v) {
                 w.setValue(v = std::min(v, LIMIT - h.value()));
                 return onChange(0, v); });
-            h.onChange.addForever([this](size_t v) {
+            h.onChange.addForever([this](uint32_t v) {
                 h.setValue(v = std::min(v, LIMIT - w.value()));
                 return onChange(1, v); });
-            e.onChange.addForever([this](size_t v) { return onChange(2, v); });
-            s.onChange.addForever([this](size_t v) { return onChange(3, v); });
+            e.onChange.addForever([this](uint32_t v) { return onChange(2, v); });
+            s.onChange.addForever([this](uint32_t v) { return onChange(3, v); });
             done.onClick.addForever([this]{ if (auto w = parentWindow()) w->close(); });
         }
 
     public:
         // 0 = width, 1 = height, 2 = music leds, 3 = serial port
-        util::event<int /* parameter */, size_t /* new value */> onChange;
+        util::event<int /* parameter */, uint32_t /* new value */> onChange;
 
     private:
         screensetup image;
@@ -184,7 +188,7 @@ namespace appui {
         padded<ui::grid> sliderGrid{{40, 40, 40, 40}, 5, 4};
         padded<ui::grid> bottomRow{{40, 40, 40, 40}, 6, 1};
         ui::button done{doneLabel.pad};
-        static constexpr size_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
+        static constexpr uint32_t LIMIT = AMBILIGHT_SERIAL_CHUNK * AMBILIGHT_CHUNKS_PER_STRIP;
         controlled_number w{sliderGrid, 0, L"Screen width",  1, LIMIT * 4 / 5, 1, true};
         controlled_number h{sliderGrid, 1, L"Screen height", 1, LIMIT * 4 / 5, 1, true};
         controlled_number e{sliderGrid, 2, L"Music LEDs",    2, LIMIT, 2, true};
@@ -447,32 +451,27 @@ namespace appui {
     };
 }
 
-int ui::main() {
-    bool initialized = false;
-    appui::state config;
+#define CONFIG_WRITE(T, name, default, out, s) out << #name << " " << s.name << "\n"
+#define CONFIG_READ(T, name, default, key, in, s) if (T value; key == #name && in >> value) s.name = value
 
+int ui::main() {
+    bool initialized = true;
+    appui::state config;
     wchar_t configPath[MAX_PATH];
     size_t i = winapi::throwOnFalse(GetModuleFileName(nullptr, configPath, MAX_PATH));
     configPath[--i] = 'g';
     configPath[--i] = 'f';
     configPath[--i] = 'c';
     try {
-        DWORD result;
-        winapi::handle file{CreateFile(configPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)};
-        winapi::throwOnFalse(file);
-        winapi::throwOnFalse(ReadFile(file.get(), &config, sizeof(config), &result, nullptr));
-        initialized = true;
-    } catch (const std::exception&) {
-        appui::state defaultConfig;
-        memcpy(&config, &defaultConfig, sizeof(config));
-    }
+        std::ifstream in{configPath};
+        for (std::string key; in >> key; ) { CONFIG_MAP(CONFIG_READ, key, in, config) }
+    } catch (const std::exception&) { initialized = false; }
 
     ui::window mainWindow{1, 1};
     mainWindow.setTitle(L"Ambilight");
     mainWindow.onDestroy.addForever([&] {
-        DWORD result;
-        if (winapi::handle file{CreateFile(configPath, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0)})
-            WriteFile(file.get(), &config, sizeof(config), &result, nullptr);
+        std::ofstream out{configPath};
+        CONFIG_MAP(CONFIG_WRITE, out, config)
         ui::quit();
     });
 
@@ -716,7 +715,7 @@ int ui::main() {
         setTestPattern();
     };
 
-    sizingConfig.onChange.addForever([&](int i, size_t value) {
+    sizingConfig.onChange.addForever([&](int i, uint32_t value) {
         switch (i) {
             case 0: config.width = value; break;
             case 1: config.height = value; break;
