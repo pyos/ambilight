@@ -4,16 +4,29 @@
 #include "texrect.hpp"
 
 namespace ui {
+    struct ibutton {
+        enum state_t { idle, hover, active };
+        virtual void setState(state_t) = 0;
+        virtual void handle() = 0;
+    };
+
     // A widget that handles mouse events like a button would.
-    struct buttonlike : texrect {
-        using texrect::texrect;
+    template <typename base_widget>
+    struct buttonlike : base_widget, ibutton {
+        using base_widget::base_widget;
+
+        // Forward events to the specified button-like widget.
+        void setTarget(ibutton* newTarget) {
+            target = newTarget;
+        }
 
         bool onMouse(POINT abs, int keys) override {
-            bool hovering = rectHit(size(), relative(abs));
+            bool hovering = rectHit(base_widget::size(), base_widget::relative(abs));
             switch (cap.update(keys)) {
                 case capture_state::ignore:  return false;
                 case capture_state::prepare: setState(hover); return false;
-                case capture_state::capture: setState(active); if (auto w = parentWindow()) w->captureMouse(*this); return true;
+                case capture_state::capture: setState(active);
+                    if (auto w = base_widget::parentWindow()) w->captureMouse(*this); return true;
                 case capture_state::drag:    setState(hovering ? active : idle); return true;
                 // Unconditionally switching to `idle` even when hovering over the button
                 // gives a little feedback that the click was actually registered.
@@ -27,12 +40,13 @@ namespace ui {
             setState(idle);
         }
 
-        enum state { idle, hover, active };
-        virtual void setState(state) = 0;
-        virtual void handle() = 0;
+    protected:
+        void setState(state_t n) override { if (target) target->setState(n); }
+        void handle() override { if (target) target->handle(); }
 
     private:
         capture_state cap;
+        ibutton* target = nullptr;
     };
 
     // A rectangular push button:
@@ -41,15 +55,15 @@ namespace ui {
     //     | Why did I draw a button here? |
     //     +-------------------------------+
     //
-    struct button : buttonlike {
-        using buttonlike::buttonlike;
+    struct button : buttonlike<texrect> {
+        using buttonlike<texrect>::buttonlike;
 
     public:
         // Emitted when the left mouse button is released over this widget.
         util::event<> onClick;
 
     protected:
-        void setState(state s) override {
+        void setState(state_t s) override {
             if (currentState != s)
                 currentState = s, invalidate();
         }
@@ -75,7 +89,7 @@ namespace ui {
         }
 
     protected:
-        state currentState = idle;
+        state_t currentState = idle;
     };
 
     struct borderless_button : button {
@@ -97,22 +111,5 @@ namespace ui {
             case active: return builtinRect(BUTTON_BORDERLESS_INNER_ACTIVE);
             }
         }
-    };
-
-    struct button_container : buttonlike {
-        using buttonlike::buttonlike;
-
-        void setTarget(buttonlike* newTarget) {
-            target = newTarget;
-        }
-
-    protected:
-        void setState(state n) override { if (target) target->setState(n); }
-        void handle() override { if (target) target->handle(); }
-        RECT getOuter() const override { return builtinRect(BUTTON_BORDERLESS_OUTER); }
-        RECT getInner() const override { return getOuter(); }
-
-    private:
-        buttonlike* target = nullptr;
     };
 }
