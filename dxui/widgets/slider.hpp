@@ -9,7 +9,6 @@ namespace ui {
     //     ----||--------------
     //
     // Values range from 0 to 1 inclusive.
-    //
     struct slider : widget {
         enum orientation { deg0, deg90, deg180, deg270 };
 
@@ -35,6 +34,13 @@ namespace ui {
             return value_;
         }
 
+        // Get the current value in an integer range from `min` to `max`.
+        template <typename T>
+        T value(T min, T max, T step = 1) const {
+            T r = (T)(value_ * (max - min) + min + step / 2. /* round to closest */);
+            return r - r % step;
+        }
+
         // Set the current value, clamping if out of bounds. Does not emit the event.
         void setValue(double v) {
             value_ = std::min(std::max(v, 0.0), 1.0);
@@ -45,13 +51,6 @@ namespace ui {
         template <typename T>
         void setValue(T v, T min, T max, T step = 1) {
             setValue((double)(v - v % step - min) / (max - min));
-        }
-
-        // Map the current value from [0, 1] to an integer range [min, max].
-        template <typename T>
-        T mapValue(T min, T max, T step = 1) const {
-            T r = (T)(value_ * (max - min) + min + step / 2. /* round to closest */);
-            return r - r % step;
         }
 
         bool onMouse(POINT abs, int keys) override {

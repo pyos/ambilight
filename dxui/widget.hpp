@@ -48,6 +48,7 @@ namespace ui {
                 lastMeasureRes = measureImpl(rnd);
                 lastMeasureArg = rnd;
             }
+            // assert(measureImpl(lastMeasureRes) == lastMeasureRes);
             return lastMeasureRes;
         }
 

@@ -60,13 +60,12 @@ namespace ui {
         }
 
         void setPrimaryCell(size_t x /* < cols */, size_t y /* < rows */) {
-            primary = {x + 1, y + 1};
+            primary = {x, y};
             invalidateSize();
         }
 
         void clearPrimaryCell() {
-            primary = {0, 0};
-            invalidateSize();
+            setPrimaryCell(cols.size(), rows.size());
         }
 
         void onChildRelease(widget& w) override {
@@ -97,7 +96,7 @@ namespace ui {
         std::vector<std::pair<alignment, alignment>> align;
         std::vector<group> cols;
         std::vector<group> rows;
-        std::pair<size_t, size_t> primary = {0, 0};
+        std::pair<size_t, size_t> primary = {cols.size(), rows.size()};
         widget* lastMouseEvent = nullptr;
     };
 }

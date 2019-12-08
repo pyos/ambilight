@@ -79,7 +79,7 @@ namespace appui {
         }
 
         uint32_t value() const {
-            return slider.mapValue(min, max, step);
+            return slider.value(min, max, step);
         }
 
         void setValue(uint32_t v) {
@@ -125,9 +125,10 @@ namespace appui {
 
     private:
         struct fixedAspectRatio : ui::widget {
-            POINT measureMinImpl() const override { return {60, 1}; }
+            POINT measureMinImpl() const override { return {60, 0}; }
             POINT measureImpl(POINT fit) const override {
-                return {std::min(fit.x, fit.y * 16 / 9 + 60), std::min(fit.x * 9 / 16 - 33, fit.y)}; }
+                return {fit.y * 16 > (fit.x - 60) * 9 ? fit.x : (fit.y * 16 + 548) / 9,
+                        fit.y * 16 < (fit.x - 60) * 9 ? fit.y : (fit.x * 9 - 555) / 16}; }
             void drawImpl(ui::dxcontext&, ID3D11Texture2D*, RECT, RECT) const override {}
         } stretch16To9;
 

@@ -1,4 +1,5 @@
 #include "grid.hpp"
+#include <algorithm>
 
 static LONG alignAs(LONG outer, LONG inner, LONG globalCenter, ui::grid::alignment a) {
     switch (a) {
@@ -37,16 +38,14 @@ POINT ui::grid::measureMinImpl() const {
 POINT ui::grid::measureImpl(POINT fit) const {
     auto allocateRemaining = [this](const std::vector<group>& m, LONG space) {
         LONG total = 0;
-        for (auto& it : m) {
-            if ((it.stretch = it.weight))
-                total += it.stretch;
-            else
-                space -= it.size = it.min;
-        }
+        for (auto& it : m) if ((it.stretch = it.weight))
+            total += it.stretch;
+        for (auto& it : m) if (!it.stretch)
+            space -= it.size = it.min;
         for (bool changed = true; changed; ) {
             changed = false;
-            for (auto& it : m) {
-                if (it.stretch && (space < 0 || (it.size = space * it.stretch / total) < it.min)) {
+            for (auto& it : m) if (it.stretch) {
+                if (space < 0 || (it.size = space * it.stretch / total) <= it.min) {
                     total -= it.stretch;
                     space -= it.size = it.min;
                     it.stretch = 0;
@@ -54,17 +53,29 @@ POINT ui::grid::measureImpl(POINT fit) const {
                 }
             }
         }
-        return space;
+        for (auto& it : m) if (it.stretch)
+            space -= it.size;
+        return std::max(0L, space);
     };
     // Assume `min` in both `c` and `r` is valid from a previous call to `measureMin`.
     POINT remaining = {allocateRemaining(cols, fit.x), allocateRemaining(rows, fit.y)};
-    if ((remaining.x || remaining.y) && primary.first && primary.second) {
-        auto& c = cols[primary.first - 1];
-        auto& r = rows[primary.second - 1];
-        if (auto& item = cells[(primary.first - 1) + (primary.second - 1) * cols.size()]) {
-            auto [w, h] = item->measure({remaining.x + c.size, remaining.y + r.size});
-            c.size = std::max(c.size, w);
-            r.size = std::max(r.size, h);
+    if (remaining.x || remaining.y) {
+        if (primary.first < cols.size() && primary.second < rows.size()) {
+            auto& c = cols[primary.first];
+            auto& r = rows[primary.second];
+            POINT extended = {remaining.x + c.size, remaining.y + r.size};
+            if (auto& item = cells[primary.first + primary.second * cols.size()])
+                extended = item->measure(extended);
+            c.size = std::max(c.size, extended.x);
+            r.size = std::max(r.size, extended.y);
+        } else {
+            // Try to find a stretchy row & column then. (This is still possible even if
+            // there is unallocated space because of rounding errors during allocation.)
+            auto cmp = [](auto& a, auto& b) { return a.stretch < b.stretch; };
+            if (auto c = std::max_element(cols.begin(), cols.end(), cmp); c != cols.end() && c->stretch)
+                c->size += remaining.x;
+            if (auto r = std::max_element(rows.begin(), rows.end(), cmp); r != rows.end() && r->stretch)
+                r->size += remaining.y;
         }
     }
     // Now that all sizes are finally set, we can compute the start offsets.
