@@ -258,7 +258,7 @@ void ui::window::drawImmediate(RECT scheduled) {
     DXGI_PRESENT_PARAMETERS presentInfo = {};
     presentInfo.DirtyRectsCount = 1;
     presentInfo.pDirtyRects = &scheduled;
-    winapi::throwOnFalse(swapChain->Present1(1, 0, &presentInfo));
+    winapi::throwOnFalse(swapChain->Present1(0, DXGI_PRESENT_RESTART, &presentInfo));
 }
 
 uint32_t ui::systemColor(ui::system_color c) {
