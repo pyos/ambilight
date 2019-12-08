@@ -482,11 +482,7 @@ int ui::main() {
 
     ui::window mainWindow{1, 1};
     mainWindow.setTitle(L"Ambilight");
-    mainWindow.onDestroy.addForever([&] {
-        std::ofstream out{configPath};
-        CONFIG_MAP(CONFIG_WRITE, out, config)
-        ui::quit();
-    });
+    mainWindow.onDestroy.addForever([&] { ui::quit(); });
 
     std::unique_ptr<appui::preview> preview;
     std::unique_ptr<ui::window> sizingWindow;
@@ -494,9 +490,10 @@ int ui::main() {
     std::unique_ptr<ui::window> previewWindow;
     appui::sizing_config sizingConfig{config};
     appui::tooltip_config tooltipConfig{config};
-    std::atomic<bool> previewing{false};
 
+    std::atomic<bool> previewing{false};
     std::atomic<bool> terminate{false};
+    std::atomic<bool> changedConfig{false};
     // These more granular mutexes (mutices?) synchronize writes to each pair of strips
     // separately. If a capture thread is unable to acquire this mutex in a timely
     // manner, it assumes the main thread has acquired it for the purpose of displaying
@@ -552,6 +549,13 @@ int ui::main() {
         }};
     };
 
+    auto configDumpThread = std::thread([&] {
+        for (; !terminate; Sleep(1000)) if (changedConfig.exchange(false)) {
+            std::ofstream out{configPath};
+            CONFIG_MAP(CONFIG_WRITE, out, config);
+        }
+    });
+
     auto videoCaptureThread = loopThread([&] {
         // Wait until the main thread allows capture threads to proceed.
         { std::unique_lock<std::timed_mutex> lk(videoMutex); };
@@ -606,7 +610,7 @@ int ui::main() {
     auto makeTransform = [&](uint8_t strip) {
         auto gamma = config.gamma.load();
         auto white = k2rgba((float)config.temperature.load());
-        auto lower = strip < 2 ? pow(config.minLevel, 1 / config.gamma) : 0;
+        auto lower = strip < 2 ? pow(config.minLevel, 1 / gamma) : 0;
         auto upper = strip < 2 ? config.brightnessV.load() : config.brightnessA.load();
         return [=](FLOATX4 color) {
             return color.apply<false>([&](float x, float y) {
@@ -621,8 +625,7 @@ int ui::main() {
 
     auto serialThread = loopThread([&] {
         auto port = config.serial.load();
-        auto filename = L"\\\\.\\COM" + std::to_wstring(port);
-        serial comm{filename.c_str()};
+        serial comm{(L"\\\\.\\COM" + std::to_wstring(port)).c_str()};
         while (port == config.serial && !terminate) {
             std::unique_lock<std::mutex> lock{mut};
             // Ping the arduino at least once per ~2s so that it knows the app is still running.
@@ -647,6 +650,7 @@ int ui::main() {
         videoCaptureThread.join();
         audioCaptureThread.join();
         serialThread.join();
+        configDumpThread.join();
     };
 
     auto setTestPattern = [&] {
@@ -738,6 +742,7 @@ int ui::main() {
             case 4: config.spiStrips = value; break;
         }
         setTestPattern();
+        changedConfig = true;
     });
     tooltipConfig.onChange.addForever([&](appui::setting s, double v) {
         switch (s) {
@@ -747,10 +752,13 @@ int ui::main() {
             case appui::La: config.brightnessA = v; break;
             case appui::Lm: config.minLevel = v; break;
         }
-        // Ping the serial thread.
-        updateLocked([&]{ });
+        updateLocked([&]{ }); // Ping the serial thread.
+        changedConfig = true;
     });
-    tooltipConfig.onColor.addForever([&](uint32_t c) { setVideoPattern(u2qd(config.color = c)); });
+    tooltipConfig.onColor.addForever([&](uint32_t c) {
+        setVideoPattern(u2qd(config.color = c));
+        changedConfig = true;
+    });
 
     winapi::holder<HMENU, DestroyMenu> menu{CreatePopupMenu()};
     winapi::throwOnFalse(AppendMenu(menu.get(), MF_STRING, 1, L"Preview"));
