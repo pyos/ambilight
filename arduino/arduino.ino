@@ -44,49 +44,47 @@ struct LEDStripPair {
 private:
   void showTimed(const uint8_t* A, const uint8_t* B, size_t n) {
     while ((uint16_t)(micros() / 256) == endTime);
-    uint8_t a = 0, b = 0, z = 0, m = 8;
+    uint8_t a, b, m, z = 0;
     __asm__ volatile (
-      "cli"               "\n" // /--------------------- cycles (1 cycle = 50 ns)
-    "%=0:"                "\n" // v   nextByte:                             ---+
-      "ld %[a], %a[A]+"   "\n" // 2     uint8_t a = *A++;                      |
-      "ld %[b], %a[B]+"   "\n" // 2     uint8_t b = *B++;                      | 250ns before byte
-      "ldi %[m], 8"       "\n" // 1     m = 8;                                 |
-    "%=1:"                "\n" //     nextBit:                              ---/
-      "lsl %[a]"          "\n" // 1     bool setA = a & 0x80; a <<= 1;         | 250ns before bit
-      "brcs %=2f"         "\n" // 1/2   if (!setA)                             | T1L = 500ns
-      "or  %[z], %[mA]"   "\n" // 1/0     z |= mA;                             | T0L = 850ns
-    "%=2:"                "\n" //                                              | (+ 100ns after byte)
-      "st -%a[P], %[mAB]" "\n" // 2     port->OUTSET = mAB;                 ---/
-      "inc %A[P]"         "\n" // 1                                            |
-      "lsl %[b]"          "\n" // 1     bool setB = b & 0x80; b <<= 1;         |
-      "brcs %=3f"         "\n" // 1/2   if (!setB)                             | T0H = 300ns
-      "or  %[z], %[mB]"   "\n" // 1/0     z |= mB;                             |
-    "%=3:"                "\n" //                                              |
-      "st %a[P], %[z]"    "\n" // 2     port->OUTCLR = z;                   ---/
-      "clr %[z]"          "\n" // 1     z = 0;                                 |
-      "dec %[m]"          "\n" // 1     bool haveMoreBits = --m;               | T1H = T0H + 350ns = 650ns
-      "brne %=4f"         "\n" // 1/    if (!haveMoreBits) {                   |
-      "sbiw %[n], 1"      "\n" // 2       bool haveMoreBytes = --n;            |
-      "st %a[P], %[mAB]"  "\n" // 2       port->OUTCLR = mAB;               ---/
-      "brne %=0b"         "\n" // 2       if (haveMoreBytes) goto nextByte;    \-- up after 100ns
-      "rjmp %=5f"         "\n" //         goto end; }
-    "%=4:"                "\n" //  /2   else {                                 |
-      "nop"               "\n" //   1                                          |
-      "st %a[P], %[mAB]"  "\n" //   2     port->OUTCLR = mAB;               ---/
-      "nop"               "\n" //   1     // Give the next bit some room.      |
-      "nop"               "\n" //   1     // The LEDs reshape signals, so this |
-      "nop"               "\n" //   1     // allows for some variation.        |
-      "rjmp %=1b"         "\n" //   2     goto nextBit; }                      \-- up after 250ns
-    "%=5:"                "\n" //     end:
-      "sei"               "\n" // total 27.9us per pixel pair (100ns between bytes + 1150ns per bit) @ 20MHz
-      : [a]  "+r"  (a)
-      , [b]  "+r"  (b)
+      "cli"                 "\n" // /--------------------- cycles (1 cycle = 50 ns)
+    "%=0:"                  "\n" // v   nextByte:                             ---+
+      "ld %[a], %a[A]+"     "\n" // 2     uint8_t a = *A++;                      |
+      "ld %[b], %a[B]+"     "\n" // 2     uint8_t b = *B++;                      |
+      "ldi %[m], 8"         "\n" // 1     m = 8;                                 |
+    "%=1:"                  "\n" //     nextBit:                                 +-- +250ns to first TxL in byte
+      "sbrs %[a], 7"        "\n" // 1/2   if (!(a & 0x80))                       |
+      "or  %[z], %[mA]"     "\n" // 1/0     z |= mA;                             |
+      "lsl %[a]"            "\n" // 1     a <<= 1;                               |
+      "std %a[P]+5, %[mAB]" "\n" // 2     port->OUTSET = mAB;                 ---/ T1L = 500ns; T0L = 850ns; +100ns if first bit
+      "sbrs %[b], 7"        "\n" // 1/2   if (!(b & 0x80))                       |
+      "or  %[z], %[mB]"     "\n" // 1/0     z |= mB;                             |
+      "lsl %[b]"            "\n" // 1     b <<= 1;                               |
+      "nop"                 "\n" // 1                                            |
+      "std %a[P]+6, %[z]"   "\n" // 2     port->OUTCLR = z;                   ---/ T0H = 300ns
+      "clr %[z]"            "\n" // 1     z = 0;                                 |
+      "dec %[m]"            "\n" // 1     bool haveMoreBits = --m;               |
+      "brne %=2f"           "\n" // 1/    if (!haveMoreBits) {                   |
+      "sbiw %[n], 1"        "\n" // 2       bool haveMoreBytes = --n;            |
+      "std %a[P]+6, %[mAB]" "\n" // 2       port->OUTCLR = mAB;               ---/ T1H = T0H + 350ns = 650ns
+      "brne %=0b"           "\n" // 2       if (haveMoreBytes) goto nextByte;    \-- +100ns to next TxL
+      "rjmp %=3f"           "\n" //         goto end; }
+    "%=2:"                  "\n" //  /2   else {                                 |
+      "nop"                 "\n" //   1                                          |
+      "std %a[P]+6, %[mAB]" "\n" //   2     port->OUTCLR = mAB;               ---/
+      "nop"                 "\n" //   1     // Give the next bit some room.      |
+      "nop"                 "\n" //   1     // The LEDs reshape signals, so this |
+      "nop"                 "\n" //   1     // allows for some variation.        |
+      "rjmp %=1b"           "\n" //   2     goto nextBit; }                      \-- +250ns to next TxL
+    "%=3:"                  "\n" //     end:
+      "sei"                 "\n" // total 27.9us per pixel pair (100ns between bytes + 1150ns per bit) @ 20MHz
+      : [a]  "=r"  (a)
+      , [b]  "=r"  (b)
+      , [m]  "=a"  (m)
       , [z]  "+r"  (z)
-      , [m]  "+a"  (m)
       , [A]  "+e"  (A)
       , [B]  "+e"  (B)
       , [n]  "+w"  (n)
-      : [P]   "e"  (&port->OUTCLR)
+      : [P]   "b"  (port)
       , [mA]  "la" (maskA)
       , [mB]  "la" (maskB)
       , [mAB] "la" (maskA | maskB)
@@ -94,29 +92,26 @@ private:
   }
 
   void showSPI(const uint8_t* A, const uint8_t* B, size_t n) {
-    const uint8_t maskABC = maskA | maskB | maskC;
-    // Start frame: 32 zeros
-    // Data: 111xxxxxbbbbbbbbggggggggrrrrrrrr
-    // End frame: max(32, n/2) zeros
-    for (uint8_t i = 0; i < 32; i++) {
+    // This looks somewhat weird, but produces better code...
+    size_t c = n > 64 ? n / 2 : 32;
+    uint8_t m = 32; do {
       port->OUTSET = maskC;
       port->OUTCLR = maskC;
-    }
-    for (size_t m = n; m--;) {
-      uint8_t a = *A++, b = *B++;
-      for (uint8_t i = 0; i < 8; i++) {
+    } while (--m);
+    do {
+      uint8_t a = *A++, b = *B++, m = 8; do {
         uint8_t z = 0;
-        if (a & 0x80) z |= maskA; a <<= 1;
-        if (b & 0x80) z |= maskB; b <<= 1;
+        if (a & 0x80) z |= maskA;
+        if (b & 0x80) z |= maskB;
         port->OUTSET = z;
         port->OUTSET = maskC;
-        port->OUTCLR = maskABC;
-      }
-    }
-    for (size_t m = n > 64 ? n / 2 : 32; m--; ) {
-      port->OUTSET = maskC;
-      port->OUTCLR = maskC;
-    }
+        port->OUTCLR = maskA | maskB | maskC;
+      } while (a <<= 1, b <<= 1, --m);
+    } while (--n);
+    do {
+      port->OUTSET = maskC; // End frame: 32 zeros for SK9822, n/2 zeros for APA102
+      port->OUTCLR = maskC; // Redundant zeros are ignored, so just write whichever is bigger.
+    } while (--c);
   }
 
 private:
@@ -138,7 +133,7 @@ static void fallbackPattern() {
   // data = {SPI 0/1, SPI 2/3, WS281x 0/1, WS281x 2/3}
   for (auto& chunk : data[0]) for (size_t i = 0; i < AMBILIGHT_SERIAL_CHUNK; i += 4) chunk[i] = 0xE0;
   for (auto& chunk : data[1]) for (size_t i = 0; i < AMBILIGHT_SERIAL_CHUNK; i += 4) chunk[i] = 0xE0;
-  data[0][0][0] /* APA102 Y */ = 0xFF;
+  data[1][0][0] /* APA102 Y */ = 0xFF;
   data[1][0][3] /* APA102 R */ = data[3][0][1] /* WS2812B R */ = 10;
   // Show using SPI first because the timed data will be ignored by SPI strips.
   for (int i = 0; i < 4; i++) (i & 1 ? strip23 : strip01).show(data[i][0], data[i][0], sizeof(data[i]), i < 2);
