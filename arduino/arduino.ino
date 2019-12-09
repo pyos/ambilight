@@ -105,6 +105,7 @@ private:
         if (b & 0x80) z |= maskB;
         port->OUTSET = z;
         port->OUTSET = maskC;
+        __asm__ volatile ("rjmp .+0\n");
         port->OUTCLR = maskA | maskB | maskC;
       } while (a <<= 1, b <<= 1, --m);
     } while (--n);
