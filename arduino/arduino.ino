@@ -99,15 +99,18 @@ private:
       port->OUTCLR = maskC;
     } while (--m);
     do {
-      uint8_t a = *A++, b = *B++, m = 8; do {
+      uint8_t a = *A++, b = *B++;
+      a ^= a >> 1;
+      b ^= b >> 1;
+      uint8_t m = 8; do {
         uint8_t z = 0;
         if (a & 0x80) z |= maskA;
         if (b & 0x80) z |= maskB;
-        port->OUTSET = z;
+        port->OUTTGL = z;
         port->OUTSET = maskC;
-        __asm__ volatile ("rjmp .+0\n");
-        port->OUTCLR = maskA | maskB | maskC;
+        port->OUTCLR = maskC;
       } while (a <<= 1, b <<= 1, --m);
+      port->OUTCLR = maskA | maskB;
     } while (--n);
     do {
       port->OUTSET = maskC; // End frame: 32 zeros for SK9822, n/2 zeros for APA102
