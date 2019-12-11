@@ -92,30 +92,50 @@ private:
   }
 
   void showSPI(const uint8_t* A, const uint8_t* B, size_t n) {
-    // This looks somewhat weird, but produces better code...
-    size_t c = n > 64 ? n / 2 : 32;
-    uint8_t m = 32; do {
-      port->OUTSET = maskC;
-      port->OUTCLR = maskC;
-    } while (--m);
-    do {
-      uint8_t a = *A++, b = *B++;
-      a ^= a >> 1;
-      b ^= b >> 1;
-      uint8_t m = 8; do {
-        uint8_t z = 0;
-        if (a & 0x80) z |= maskA;
-        if (b & 0x80) z |= maskB;
-        port->OUTTGL = z;
-        port->OUTSET = maskC;
-        port->OUTCLR = maskC;
-      } while (a <<= 1, b <<= 1, --m);
-      port->OUTCLR = maskA | maskB;
-    } while (--n);
-    do {
-      port->OUTSET = maskC; // End frame: 32 zeros for SK9822, n/2 zeros for APA102
-      port->OUTCLR = maskC; // Redundant zeros are ignored, so just write whichever is bigger.
-    } while (--c);
+    // `w` is current state, `z` is delta for next state. The start frame is 32 zeros.
+    uint8_t a, b, m = 32, z, w = 0;
+    do port->OUTSET = maskC,
+       port->OUTCLR = maskC; while (--m);
+    // The end frame is 32 zeros for SK9822, n/8 zeros (i.e. one toggle per LED)
+    // for APA102. Redundant zeros are ignored, so just write whichever is bigger.
+    size_t c = n > 256 ? n / 8 : 32;
+    __asm__( // avr-gcc tends to generate garbage code
+    "%=0:"                   "\n" // do {
+      "ld   %[a], %a[A]+"    "\n" //   a = *A++;
+      "ld   %[b], %a[B]+"    "\n" //   b = *B++;
+      "ldi  %[m], 8"         "\n" //   m = 8;
+    "%=1:"                   "\n" //   do {
+      "mov  %[z], %[w]"      "\n" //     z = w;
+      "sbrc %[a], 7"         "\n" //     if (a & 0x80)
+      "eor  %[z], %[mA]"     "\n" //       z ^= maskA;
+      "sbrc %[b], 7"         "\n" //     if (b & 0x80)
+      "eor  %[z], %[mB]"     "\n" //       z ^= maskB;
+      "std  %a[P]+7, %[z]"   "\n" //     port->OUTTGL = z;
+      "eor  %[w], %[z]"      "\n" //     w ^= z;  // do this between port writes to let the data line
+      "lsl  %[a]"            "\n" //     a <<= 1; // voltage stabilize before toggling the clock line
+      "lsl  %[b]"            "\n" //     b <<= 1;
+      "or   %[w], %[mC]"     "\n" //     w |= maskC;
+      "std  %a[P]+5, %[mC]"  "\n" //     port->OUTSET = maskC;
+      "dec  %[m]"            "\n" //   } while (--m);
+      "brne %=1b"            "\n" //
+      "sbiw %[n], 1"         "\n" // } while (--n);
+      "brne %=0b"            "\n" // total 27.2us per pixel pair (400ns between bytes + 800ns per bit @ 20MHz)
+      : [a]  "=r"  (a)
+      , [b]  "=r"  (b)
+      , [m]  "=a"  (m)
+      , [z]  "=r"  (z)
+      , [w]  "+r"  (w)
+      , [A]  "+e"  (A)
+      , [B]  "+e"  (B)
+      , [n]  "+w"  (n)
+      : [P]   "b"  (port)
+      , [mA]  "la" (maskA)
+      , [mB]  "la" (maskB)
+      , [mC]  "la" (maskC)
+    );
+    port->OUTCLR = w;
+    do port->OUTSET = maskC,
+       port->OUTCLR = maskC; while (--c);
   }
 
 private:
