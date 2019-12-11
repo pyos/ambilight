@@ -44,43 +44,43 @@ struct LEDStripPair {
 private:
   void showTimed(const uint8_t* A, const uint8_t* B, size_t n) {
     while ((uint16_t)(micros() / 256) == endTime);
-    uint8_t a, b, m, z = 0;
+    uint8_t a, b, m, z;
     __asm__ volatile (
-      "cli"                 "\n" // /--------------------- cycles (1 cycle = 50 ns)
-    "%=0:"                  "\n" // v   nextByte:                             ---+
-      "ld %[a], %a[A]+"     "\n" // 2     uint8_t a = *A++;                      |
-      "ld %[b], %a[B]+"     "\n" // 2     uint8_t b = *B++;                      |
-      "ldi %[m], 8"         "\n" // 1     m = 8;                                 |
-    "%=1:"                  "\n" //     nextBit:                                 +-- +250ns to first TxL in byte
-      "sbrs %[a], 7"        "\n" // 1/2   if (!(a & 0x80))                       |
-      "or  %[z], %[mA]"     "\n" // 1/0     z |= mA;                             |
-      "lsl %[a]"            "\n" // 1     a <<= 1;                               |
-      "std %a[P]+5, %[mAB]" "\n" // 2     port->OUTSET = mAB;                 ---/ T1L = 500ns; T0L = 850ns; +100ns if first bit
-      "sbrs %[b], 7"        "\n" // 1/2   if (!(b & 0x80))                       |
-      "or  %[z], %[mB]"     "\n" // 1/0     z |= mB;                             |
-      "lsl %[b]"            "\n" // 1     b <<= 1;                               |
-      "nop"                 "\n" // 1                                            |
-      "std %a[P]+6, %[z]"   "\n" // 2     port->OUTCLR = z;                   ---/ T0H = 300ns
-      "clr %[z]"            "\n" // 1     z = 0;                                 |
-      "dec %[m]"            "\n" // 1     bool haveMoreBits = --m;               |
-      "brne %=2f"           "\n" // 1/    if (!haveMoreBits) {                   |
-      "sbiw %[n], 1"        "\n" // 2       bool haveMoreBytes = --n;            |
-      "std %a[P]+6, %[mAB]" "\n" // 2       port->OUTCLR = mAB;               ---/ T1H = T0H + 350ns = 650ns
-      "brne %=0b"           "\n" // 2       if (haveMoreBytes) goto nextByte;    \-- +100ns to next TxL
-      "rjmp %=3f"           "\n" //         goto end; }
-    "%=2:"                  "\n" //  /2   else {                                 |
-      "nop"                 "\n" //   1                                          |
-      "std %a[P]+6, %[mAB]" "\n" //   2     port->OUTCLR = mAB;               ---/
-      "nop"                 "\n" //   1     // Give the next bit some room.      |
-      "nop"                 "\n" //   1     // The LEDs reshape signals, so this |
-      "nop"                 "\n" //   1     // allows for some variation.        |
-      "rjmp %=1b"           "\n" //   2     goto nextBit; }                      \-- +250ns to next TxL
-    "%=3:"                  "\n" //     end:
-      "sei"                 "\n" // total 27.9us per pixel pair (100ns between bytes + 1150ns per bit) @ 20MHz
+      "cli"                  "\n" //                                       // cycles (1 cycle = 50 ns)
+    "%=0:"                   "\n" // nextByte:                             //     -+
+      "ld  %[a], %a[A]+"     "\n" //   a = *A++;                           // 2    |
+      "ld  %[b], %a[B]+"     "\n" //   b = *B++;                           // 2    |
+      "ldi %[m], 8"          "\n" //   m = 8;                              // 1    |
+    "%=1:"                   "\n" // nextBit:                              //      \- +250ns to first TxL in byte
+      "clr  %[z]"            "\n" //   z = 0;                              // 1    |
+      "sbrs %[a], 7"         "\n" //   if (!(a & 0x80))                    // 1/2  |
+      "or   %[z], %[mA]"     "\n" //     z |= maskA;                       // 1/0  | T0L = 850~950ns
+      "std  %a[P]+5, %[mAB]" "\n" //   port->OUTSET = maskA | maskB;       // 2   -/ T1L = 500~600ns
+      "sbrs %[b], 7"         "\n" //   if (!(b & 0x80))                    // 1/2  |
+      "or   %[z], %[mB]"     "\n" //     z |= maskB;                       // 1/0  |
+      "nop"                  "\n" //                                       // 1    |
+      "nop"                  "\n" //                                       // 1    |
+      "std  %a[P]+6, %[z]"   "\n" //   port->OUTCLR = z;                   // 2   -/ T0H = 300ns
+      "nop"                  "\n" //                                       // 1    |
+      "dec  %[m]"            "\n" //                                       // 1    |
+      "brne %=2f"            "\n" //   if (!--m) {                         // 1/   |
+      "sbiw %[n], 1"         "\n" //     bool haveMoreBytes = --n;         // 2    |
+      "std  %a[P]+6, %[mAB]" "\n" //     port->OUTCLR = maskA | maskB;     // 2   -/ T1H = T0H + 350ns = 650ns
+      "brne %=0b"            "\n" //     if (haveMoreBytes) goto nextByte; // 2    \- +100ns to next TxL
+      "rjmp %=3f"            "\n" //     goto end; }
+    "%=2:"                   "\n" //   else {                              //  /2  |
+      "nop"                  "\n" //                                       //   1  |
+      "std  %a[P]+6, %[mAB]" "\n" //     port->OUTCLR = maskA | maskB;     //   2 -/
+      "nop"                  "\n" //                                       //   1  |
+      "lsl  %[a]"            "\n" //     a <<= 1;                          //   1  |
+      "lsl  %[b]"            "\n" //     b <<= 1;                          //   1  |
+      "rjmp %=1b"            "\n" //     goto nextBit; }                   //   2  \- +250ns to next TxL
+    "%=3:"                   "\n" // end:
+      "sei"                  "\n" // total 27.9us per pixel pair (100ns between bytes + 1150ns per bit) @ 20MHz
       : [a]  "=r"  (a)
       , [b]  "=r"  (b)
       , [m]  "=a"  (m)
-      , [z]  "+r"  (z)
+      , [z]  "=r"  (z)
       , [A]  "+e"  (A)
       , [B]  "+e"  (B)
       , [n]  "+w"  (n)
