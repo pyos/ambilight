@@ -13,10 +13,9 @@
 // maximum number of LEDs updated in the strips of each pair. For WS2812B-like LEDs,
 // each pair of LEDs takes 27.9us to refresh.
 //
-// If incorrect serial data is received, or any data takes more than a second to arrive,
-// the Arduino will blink its integrated LED. If no data at all (not even incorrect data
-// is received for 4 seconds in a row, all strips will only display a dim red light on
-// the first LED. To keep the same state, periodic empty transactions can be used.
+// If incorrect serial data is received, any data takes more than a second to arrive,
+// or there is no data at all for 4 seconds in a row, all strips will display a dim
+// red light on the first LED.
 
 #include "arduino.h"
 
@@ -157,8 +156,8 @@ static void fallbackPattern() {
   // data = {SPI 0/1, SPI 2/3, WS281x 0/1, WS281x 2/3}
   for (auto& chunk : data[0]) for (size_t i = 0; i < AMBILIGHT_SERIAL_CHUNK; i += 4) chunk[i] = 0xE0;
   for (auto& chunk : data[1]) for (size_t i = 0; i < AMBILIGHT_SERIAL_CHUNK; i += 4) chunk[i] = 0xE0;
-  data[1][0][0] /* APA102 Y */ = 0xFF;
-  data[1][0][3] /* APA102 R */ = data[3][0][1] /* WS2812B R */ = 10;
+  data[0][0][0] = data[1][0][0] /* APA102 Y */ = 0xFF;
+  data[0][0][3] = data[1][0][3] /* APA102 R */ = data[2][0][1] = data[3][0][1] /* WS2812B R */ = 10;
   // Show using SPI first because the timed data will be ignored by SPI strips.
   for (int i = 0; i < 4; i++) (i & 1 ? strip23 : strip01).show(data[i][0], data[i][0], sizeof(data[i]), i < 2);
   valid = false;
@@ -166,14 +165,13 @@ static void fallbackPattern() {
 
 void setup() {
   fallbackPattern();
-  pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(AMBILIGHT_SERIAL_BAUD_RATE);
   while (!Serial);
 }
 
 void loop() {
   for (uint8_t i = 1; !Serial.find("<RGBDATA"); i++)
-    if (i == 4 /* seconds */)
+    if (i % 4 /* seconds */ == 0)
       fallbackPattern();
 
   uint8_t index;
@@ -194,9 +192,5 @@ void loop() {
     if (ns[i / 2] <= j)
       ns[i / 2] = j + 1;
   }
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(100);
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(100);
-  valid = false;
+  fallbackPattern();
 }
