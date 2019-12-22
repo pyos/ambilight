@@ -97,8 +97,8 @@ private:
        port->OUTCLR = maskC; while (--m);
     // The end frame is 32 zeros for SK9822, n/8 zeros (i.e. one toggle per LED)
     // for APA102. Redundant zeros are ignored, so just write whichever is bigger.
-    size_t c = n > 256 ? n / 8 : 32;
-    __asm__( // avr-gcc tends to generate garbage code
+    size_t c = n > 256 ? (n + 7) / 8 : 32;
+    __asm__ volatile( // avr-gcc tends to generate garbage code
     "%=0:"                   "\n" // do {
       "ld   %[a], %a[A]+"    "\n" //   a = *A++;
       "ld   %[b], %a[B]+"    "\n" //   b = *B++;
@@ -118,7 +118,9 @@ private:
       "dec  %[m]"            "\n" //   } while (--m);
       "brne %=1b"            "\n" //
       "sbiw %[n], 1"         "\n" // } while (--n);
-      "brne %=0b"            "\n" // total 27.2us per pixel pair (400ns between bytes + 800ns per bit @ 20MHz)
+      "brne %=0b"            "\n" //
+      "std  %a[P]+6, %[w]"   "\n" // port->OUTCLR = w;
+      "rjmp .+0"             "\n" // total 27.2us per pixel pair (400ns between bytes + 800ns per bit @ 20MHz)
       : [a]  "=r"  (a)
       , [b]  "=r"  (b)
       , [m]  "=a"  (m)
@@ -132,7 +134,6 @@ private:
       , [mB]  "la" (maskB)
       , [mC]  "la" (maskC)
     );
-    port->OUTCLR = w;
     do port->OUTSET = maskC,
        port->OUTCLR = maskC; while (--c);
   }
